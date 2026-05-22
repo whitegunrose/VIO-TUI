@@ -43,18 +43,18 @@ func BuildMainWidgets(data *model.AppData) ([]tview.Primitive, *tview.Flex) {
 	wAssignments.SetText(buildAssignmentsSummary(data))
 
 	mainBody := tview.NewFlex().SetDirection(tview.FlexRow).
-	AddItem(tview.NewBox(), 1, 3, false).
-	AddItem(
-		tview.NewFlex().SetDirection(tview.FlexColumn).
-		AddItem(wCalendar, 0, 2, false).
-		AddItem(wCourses, 0, 1, false).
-		AddItem(wTodo, 0, 1, false),
-		0, 1, false).
-	AddItem(
-		tview.NewFlex().SetDirection(tview.FlexColumn).
-		AddItem(wSchedule, 0, 1, false).
-		AddItem(wAssignments, 0, 1, false),
-		0, 1, false)
+		AddItem(tview.NewBox(), 1, 3, false).
+		AddItem(
+			tview.NewFlex().SetDirection(tview.FlexColumn).
+				AddItem(wCalendar, 0, 2, false).
+				AddItem(wCourses, 0, 1, false).
+				AddItem(wTodo, 0, 1, false),
+			0, 1, false).
+		AddItem(
+			tview.NewFlex().SetDirection(tview.FlexColumn).
+				AddItem(wSchedule, 0, 1, false).
+				AddItem(wAssignments, 0, 1, false),
+			0, 1, false)
 
 	quitPadding := tview.NewTextView().
 		SetTextAlign(tview.AlignCenter).
