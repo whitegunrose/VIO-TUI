@@ -10,3 +10,7 @@
 *.exe
 *.out
 /vio
+
+# AI Development Life Cycle Documents
+.kiro/
+aidlc-docs
