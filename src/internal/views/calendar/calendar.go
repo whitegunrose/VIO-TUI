@@ -3,6 +3,7 @@ package calendar
 import (
 	"VIO/internal/asciiart"
 	"VIO/internal/model"
+	"VIO/internal/views/schedule"
 	"fmt"
 	"strings"
 	"time"
@@ -88,7 +89,7 @@ func CalendarPage(app *tview.Application, data *model.AppData, returnTo func()) 
 	footer := tview.NewTextView().
 		SetTextAlign(tview.AlignCenter).
 		SetDynamicColors(true).
-		SetText("[ < ^ v > ] MOVE DAY    [ N ] NEXT MONTH    [ P ] PREV MONTH")
+		SetText("[ < ^ v > ] MOVE DAY    [ ENTER ] OPEN DAY    [ N ] NEXT MONTH    [ P ] PREV MONTH")
 
 	// Bringing header, main body, and footer together
 	page := tview.NewFlex().SetDirection(tview.FlexRow).
@@ -101,6 +102,13 @@ func CalendarPage(app *tview.Application, data *model.AppData, returnTo func()) 
 		switch event.Key() {
 		case tcell.KeyEsc:
 			returnTo()
+			return nil
+		case tcell.KeyEnter:
+			selected := time.Date(state.year, state.month, state.selectedDay, 0, 0, 0, 0, time.Local)
+			dayPage := schedule.DayPage(app, data, selected, "CALENDAR", func() {
+				app.SetRoot(page, true).SetFocus(page)
+			})
+			app.SetRoot(dayPage, true).SetFocus(dayPage)
 			return nil
 		case tcell.KeyLeft:
 			moveSelectedDay(state, -1)

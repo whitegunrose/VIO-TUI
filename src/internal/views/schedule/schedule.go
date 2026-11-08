@@ -14,6 +14,12 @@ import (
 )
 
 func SchedulePage(app *tview.Application, data *model.AppData, returnTo func()) tview.Primitive {
+	return DayPage(app, data, time.Now(), "MAIN", returnTo)
+}
+
+// DayPage shows the assignments and tasks due on the given day.
+// returnLabel names the screen Esc goes back to (e.g. "MAIN", "CALENDAR").
+func DayPage(app *tview.Application, data *model.AppData, day time.Time, returnLabel string, returnTo func()) tview.Primitive {
 
 	// Header
 
@@ -28,7 +34,7 @@ func SchedulePage(app *tview.Application, data *model.AppData, returnTo func()) 
 	quitText := tview.NewTextView().
 		SetDynamicColors(true).
 		SetTextAlign(tview.AlignRight).
-		SetText("[white::b][ ESC ] To RETURN TO MAIN")
+		SetText("[white::b][ ESC ] To RETURN TO " + returnLabel)
 
 	quit := tview.NewFlex().
 		SetDirection(tview.FlexRow).
@@ -39,8 +45,8 @@ func SchedulePage(app *tview.Application, data *model.AppData, returnTo func()) 
 		SetTextAlign(tview.AlignCenter).
 		SetDynamicColors(true)
 
-	currMonth := time.Now().Month().String()
-	currDay := strconv.Itoa(time.Now().Day())
+	currMonth := day.Month().String()
+	currDay := strconv.Itoa(day.Day())
 
 	title.SetText(asciiart.GetMonthHeader(currMonth) + asciiart.GetDayHeader(currDay))
 
@@ -53,7 +59,7 @@ func SchedulePage(app *tview.Application, data *model.AppData, returnTo func()) 
 	// Schedule Box
 
 	scheduleBody := tview.NewTextView().SetDynamicColors(true)
-	scheduleBody.SetText(renderUpcomingFeed(data))
+	scheduleBody.SetText(renderUpcomingFeed(data, day))
 
 	mainBody := tview.NewFlex().SetDirection(tview.FlexColumn).
 		AddItem(tview.NewBox(), 0, 1, false).
@@ -83,49 +89,46 @@ func SchedulePage(app *tview.Application, data *model.AppData, returnTo func()) 
 	return page
 }
 
-func renderUpcomingFeed(data *model.AppData) string {
+func renderUpcomingFeed(data *model.AppData, day time.Time) string {
 	type item struct {
 		label string
 		due   time.Time
 	}
 
-	now := time.Now()
-	var todayItems []item
-	var pastItems []item
+	var items []item
 
 	for _, assignment := range data.Assignments {
-		if assignment.DueAt == nil {
+		if assignment.DueAt == nil || !sameLocalDay(*assignment.DueAt, day) {
 			continue
 		}
 
-		due := assignment.DueAt.In(time.Local)
-		entry := item{
+		items = append(items, item{
 			label: fmt.Sprintf("Assignment: %s", assignment.Name),
-			due:   due,
-		}
-
-		if sameLocalDay(due, now) {
-			todayItems = append(todayItems, entry)
-		} else if due.Before(now) {
-			pastItems = append(pastItems, entry)
-		}
+			due:   assignment.DueAt.In(time.Local),
+		})
 	}
 
-	sort.Slice(todayItems, func(i, j int) bool {
-		return todayItems[i].due.Before(todayItems[j].due)
-	})
-	sort.Slice(pastItems, func(i, j int) bool {
-		return pastItems[i].due.Before(pastItems[j].due)
-	})
+	for _, task := range data.Tasks {
+		if task.DueAt == nil || !sameLocalDay(*task.DueAt, day) {
+			continue
+		}
 
-	allItems := append(todayItems, pastItems...)
-
-	if len(allItems) == 0 {
-		return "No dated items loaded yet."
+		items = append(items, item{
+			label: fmt.Sprintf("Task: %s (%s)", task.Title, strings.ReplaceAll(task.Status, "_", " ")),
+			due:   task.DueAt.In(time.Local),
+		})
 	}
+
+	if len(items) == 0 {
+		return "No items for this day."
+	}
+
+	sort.Slice(items, func(i, j int) bool {
+		return items[i].due.Before(items[j].due)
+	})
 
 	var lines []string
-	for _, it := range todayItems {
+	for _, it := range items {
 		lines = append(lines, fmt.Sprintf("%s\n%s", it.label, it.due.Format("Mon Jan 2, 3:04 PM")))
 	}
 
