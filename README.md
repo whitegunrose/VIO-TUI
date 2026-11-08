@@ -232,6 +232,7 @@ Contributions are welcome! If you have an idea that would make VIO better, open 
 
    ```sh
    cd src
+   gofmt -l .     # should print nothing
    go vet ./...
    go build ./...
    go run .       # try it out in your terminal
