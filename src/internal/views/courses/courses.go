@@ -81,18 +81,19 @@ func CoursesPage(app *tview.Application, data *model.AppData, returnTo func()) t
 		AddItem(tview.NewBox(), 0, 1, false).
 		AddItem(schoolInfo, 0, 3, false).
 		AddItem(tview.NewBox(), 0, 1, false).
-		AddItem(courseInfo, 0, 7, false).
+		AddItem(courseInfo, 0, 7, true). // focused so it scrolls with j/k and arrows
 		AddItem(tview.NewBox(), 0, 1, false)
 
 	// Footer below course and school info
 	footer := tview.NewTextView().
 		SetTextAlign(tview.AlignCenter).
-		SetDynamicColors(true)
+		SetDynamicColors(true).
+		SetText("[ ^ v ] or [ J K ] SCROLL    [ G ] TOP    [ SHIFT+G ] BOTTOM")
 
 	// Bringing header, main body, and footer together with paddings
 	page := tview.NewFlex().SetDirection(tview.FlexRow).
 		AddItem(header, 0, 2, false).
-		AddItem(mainBody, 0, 5, false).
+		AddItem(mainBody, 0, 5, true).
 		AddItem(footer, 0, 1, false)
 
 	page.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
