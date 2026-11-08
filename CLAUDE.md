@@ -31,7 +31,7 @@ go test ./internal/store -run TestName   # single test, once tests exist
   - `widgets.go` builds the 5 dashboard panels (Calendar, Courses, Tasks, Schedule, Assignments) and their summary text.
   - `navigation.go` handles dashboard keys: `1`–`5` focus a panel, `Enter` opens it, `c` opens Canvas settings, `q` quits.
   - `screenrouter.go` maps panel index → page constructor. The panel order in `BuildMainWidgets` must stay in sync with the `ScreenRouter` switch and `RefreshMainWidgets`.
-- **`internal/views/<feature>`** — full-screen pages. Convention: `XxxPage(app *tview.Application, data *model.AppData, returnTo func()) tview.Primitive`. Pages swap themselves in with `app.SetRoot(...)` and call `returnTo` on Esc. The `*_page.go` files are empty placeholders for future detail pages. Views currently only read `AppData`; persistence happens in `main.go` after a sync.
+- **`internal/views/<feature>`** — full-screen pages. Convention: `XxxPage(app *tview.Application, data *model.AppData, returnTo func()) tview.Primitive`. Pages swap themselves in with `app.SetRoot(...)` and call `returnTo` on Esc. The `*_page.go` files are empty placeholders for future detail pages. Most views only read `AppData`; the tasks page (`views/tasks`) edits `data.Tasks` and saves with `store.SaveAppData` itself. Canvas sync in `main.go` keeps the live task list when applying results, and `ScreenRouter` refreshes dashboard summaries when a page returns.
 - **`internal/asciiart`** — large ASCII headers for day and month names used by the calendar views.
 
 Text styling uses tview color tags (`[white::b]...[::-]`, `[red]...[-]`), so TextViews need `SetDynamicColors(true)`.

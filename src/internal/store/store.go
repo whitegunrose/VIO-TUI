@@ -308,7 +308,8 @@ func normalizeAppData(data model.AppData) (model.AppData, bool) {
 		}
 		normalizedTasks = append(normalizedTasks, task)
 	}
-	if len(normalizedTasks) == 0 {
+	// Only seed sample tasks when the list is missing, so deleting every task sticks
+	if data.Tasks == nil {
 		normalizedTasks = defaults.Tasks
 		changed = true
 	}

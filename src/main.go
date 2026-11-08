@@ -58,6 +58,8 @@ func main() {
 					return
 				}
 
+				// Sync only touches courses and assignments; keep tasks edited since it started
+				updated.Tasks = data.Tasks
 				*data = updated
 
 				if err := store.SaveAppData(*data); err != nil {

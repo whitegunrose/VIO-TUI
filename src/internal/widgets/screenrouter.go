@@ -19,27 +19,23 @@ func ScreenRouter(app *tview.Application, widgets []tview.Primitive, layout *tvi
 	return func(index int) {
 		var screen tview.Primitive
 
+		// Pages can edit data, so redraw the dashboard summaries on the way back
+		back := func() {
+			RefreshMainWidgets(widgets, data)
+			app.SetRoot(layout, true).SetFocus(widgets[index])
+		}
+
 		switch index {
 		case 0:
-			screen = calendar.CalendarPage(app, data, func() {
-				app.SetRoot(layout, true).SetFocus(widgets[index])
-			})
+			screen = calendar.CalendarPage(app, data, back)
 		case 1:
-			screen = courses.CoursesPage(app, data, func() {
-				app.SetRoot(layout, true).SetFocus(widgets[index])
-			})
+			screen = courses.CoursesPage(app, data, back)
 		case 2:
-			screen = tasks.TasksPage(app, data, func() {
-				app.SetRoot(layout, true).SetFocus(widgets[index])
-			})
+			screen = tasks.TasksPage(app, data, back)
 		case 3:
-			screen = schedule.SchedulePage(app, data, func() {
-				app.SetRoot(layout, true).SetFocus(widgets[index])
-			})
+			screen = schedule.SchedulePage(app, data, back)
 		case 4:
-			screen = assignments.AssignmentsPage(app, data, func() {
-				app.SetRoot(layout, true).SetFocus(widgets[index])
-			})
+			screen = assignments.AssignmentsPage(app, data, back)
 		default:
 			tv := tview.NewTextView().
 				SetTextAlign(tview.AlignCenter).
@@ -48,7 +44,7 @@ func ScreenRouter(app *tview.Application, widgets []tview.Primitive, layout *tvi
 
 			tv.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 				if event.Key() == tcell.KeyEsc {
-					app.SetRoot(layout, true).SetFocus(widgets[index])
+					back()
 					return nil
 				}
 				return event
