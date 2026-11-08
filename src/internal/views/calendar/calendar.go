@@ -255,14 +255,14 @@ func dayLine(day int, selected bool, today bool) string {
 	var dayText string
 
 	switch {
-		case selected && today:
-			dayText = fmt.Sprintf("[black:green]%2d[-:-]", day)
-		case selected:
-			dayText = fmt.Sprintf("[black:white]%2d[-:-]", day)
-		case today:
-			dayText = fmt.Sprintf("[green]%2d[-]", day)
-		default:
-			dayText = fmt.Sprintf("%2d", day)
+	case selected && today:
+		dayText = fmt.Sprintf("[black:green]%2d[-:-]", day)
+	case selected:
+		dayText = fmt.Sprintf("[black:white]%2d[-:-]", day)
+	case today:
+		dayText = fmt.Sprintf("[green]%2d[-]", day)
+	default:
+		dayText = fmt.Sprintf("%2d", day)
 	}
 
 	return fmt.Sprintf("|  %s  |", dayText)

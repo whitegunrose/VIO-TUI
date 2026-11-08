@@ -36,23 +36,23 @@ func HandleNavigation(dashboard *tview.Flex, widgets []tview.Primitive, openScre
 	// Set up input handling for navigation and screen opening
 	dashboard.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		switch event.Key() {
-			case tcell.KeyRune:
-				switch event.Rune() {
-					case 'q', 'Q': // q to quit app globally
-						stopApp()
-						return nil
+		case tcell.KeyRune:
+			switch event.Rune() {
+			case 'q', 'Q': // q to quit app globally
+				stopApp()
+				return nil
 
-					case 'c', 'C':
-						openCanvasSettings()
-						return nil
+			case 'c', 'C':
+				openCanvasSettings()
+				return nil
 
-					case '1', '2', '3', '4', '5':
-						focusIndex = int(event.Rune() - '1')
-						updateFocus(focusIndex)
-						return nil
-				}
-					case tcell.KeyEnter:
-						openScreen(focusIndex)
+			case '1', '2', '3', '4', '5':
+				focusIndex = int(event.Rune() - '1')
+				updateFocus(focusIndex)
+				return nil
+			}
+		case tcell.KeyEnter:
+			openScreen(focusIndex)
 		}
 		return event
 	})

@@ -6,8 +6,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
-	"time"
 	"strings"
+	"time"
 )
 
 const appFolderName = "vio"
@@ -119,23 +119,23 @@ func defaultAppData() model.AppData {
 		},
 		Courses: []model.Course{
 			{
-				ID:       "comp123",
-				Name:     "Introduction to Computer",
-				Code:     "COMP 123",
-				Term:     "Spring 2032",
-				CanvasID: 12345,
-				Workflow: "available",
-				Location: "JD 1234",
+				ID:           "comp123",
+				Name:         "Introduction to Computer",
+				Code:         "COMP 123",
+				Term:         "Spring 2032",
+				CanvasID:     12345,
+				Workflow:     "available",
+				Location:     "JD 1234",
 				MeetingTimes: []string{"Mon 12:34 PM", "Wed 12:34 PM"},
 			},
 			{
-				ID:       "comp456",
-				Name:     "Analysis of Computer",
-				Code:     "COMP 456",
-				Term:     "Spring 2032",
-				CanvasID: 67890,
-				Workflow: "available",
-				Location: "JD 5678",
+				ID:           "comp456",
+				Name:         "Analysis of Computer",
+				Code:         "COMP 456",
+				Term:         "Spring 2032",
+				CanvasID:     67890,
+				Workflow:     "available",
+				Location:     "JD 5678",
 				MeetingTimes: []string{"Tue 10:23 AM", "Thu 10:23 AM"},
 			},
 		},
@@ -187,145 +187,145 @@ func defaultAppData() model.AppData {
 
 func normalizeAppData(data model.AppData) (model.AppData, bool) {
 	defaults := defaultAppData()
-		changed := false
-		now := time.Now()
+	changed := false
+	now := time.Now()
 
-		if strings.TrimSpace(data.Student.Name) == "" {
-			data.Student.Name = defaults.Student.Name
+	if strings.TrimSpace(data.Student.Name) == "" {
+		data.Student.Name = defaults.Student.Name
+		changed = true
+	}
+	if strings.TrimSpace(data.Student.School) == "" {
+		data.Student.School = defaults.Student.School
+		changed = true
+	}
+
+	courseSeen := make(map[string]bool)
+	normalizedCourses := make([]model.Course, 0, len(data.Courses))
+	for i, course := range data.Courses {
+		def := defaults.Courses[i%len(defaults.Courses)]
+		if strings.TrimSpace(course.ID) == "" {
+			course.ID = def.ID
 			changed = true
 		}
-		if strings.TrimSpace(data.Student.School) == "" {
-			data.Student.School = defaults.Student.School
+		if strings.TrimSpace(course.Name) == "" {
+			course.Name = def.Name
+			changed = true
+		}
+		if strings.TrimSpace(course.Code) == "" {
+			course.Code = def.Code
+			changed = true
+		}
+		if courseSeen[course.ID] {
+			course.ID = fmt.Sprintf("%s-%d", def.ID, i+1)
+			changed = true
+		}
+		courseSeen[course.ID] = true
+		normalizedCourses = append(normalizedCourses, course)
+	}
+	if len(normalizedCourses) == 0 {
+		normalizedCourses = defaults.Courses
+		changed = true
+	}
+	data.Courses = normalizedCourses
+
+	courseValid := make(map[string]bool, len(data.Courses))
+	for _, c := range data.Courses {
+		courseValid[c.ID] = true
+	}
+
+	normalizedAssignments := make([]model.Assignment, 0, len(data.Assignments))
+	assignSeen := make(map[string]bool)
+	for i, assignment := range data.Assignments {
+		def := defaults.Assignments[i%len(defaults.Assignments)]
+		if strings.TrimSpace(assignment.ID) == "" {
+			assignment.ID = def.ID
+			changed = true
+		}
+		if strings.TrimSpace(assignment.CourseID) == "" || !courseValid[assignment.CourseID] {
+			assignment.CourseID = def.CourseID
+			changed = true
+		}
+		if strings.TrimSpace(assignment.Name) == "" {
+			assignment.Name = def.Name
+			changed = true
+		}
+		if assignment.DueAt == nil {
+			assignment.DueAt = def.DueAt
+			changed = true
+		}
+		if assignSeen[assignment.ID] {
+			assignment.ID = fmt.Sprintf("%s-%d", def.ID, i+1)
+			changed = true
+		}
+		assignSeen[assignment.ID] = true
+		normalizedAssignments = append(normalizedAssignments, assignment)
+	}
+	if len(normalizedAssignments) == 0 {
+		normalizedAssignments = defaults.Assignments
+		changed = true
+	}
+	data.Assignments = normalizedAssignments
+
+	normalizedTasks := make([]model.Task, 0, len(data.Tasks))
+	taskSeen := make(map[string]bool)
+	for i, task := range data.Tasks {
+		def := defaults.Tasks[i%len(defaults.Tasks)]
+		if strings.TrimSpace(task.ID) == "" {
+			task.ID = def.ID
+			changed = true
+		}
+		if taskSeen[task.ID] {
+			task.ID = fmt.Sprintf("%s-%d", def.ID, i+1)
+			changed = true
+		}
+		taskSeen[task.ID] = true
+		if strings.TrimSpace(task.Title) == "" {
+			task.Title = def.Title
+			changed = true
+		}
+		if strings.TrimSpace(task.CourseID) != "" && !courseValid[task.CourseID] {
+			task.CourseID = ""
+			changed = true
+		}
+		if task.DueAt == nil {
+			task.DueAt = def.DueAt
+			changed = true
+		}
+		if task.StartsAt == nil && task.DueAt != nil {
+			start := task.DueAt.Add(-1 * time.Hour)
+			task.StartsAt = &start
 			changed = true
 		}
 
-		courseSeen := make(map[string]bool)
-		normalizedCourses := make([]model.Course, 0, len(data.Courses))
-		for i, course := range data.Courses {
-			def := defaults.Courses[i%len(defaults.Courses)]
-			if strings.TrimSpace(course.ID) == "" {
-				course.ID = def.ID
-				changed = true
-			}
-			if strings.TrimSpace(course.Name) == "" {
-				course.Name = def.Name
-				changed = true
-			}
-			if strings.TrimSpace(course.Code) == "" {
-				course.Code = def.Code
-				changed = true
-			}
-			if courseSeen[course.ID] {
-				course.ID = fmt.Sprintf("%s-%d", def.ID, i+1)
-				changed = true
-			}
-			courseSeen[course.ID] = true
-			normalizedCourses = append(normalizedCourses, course)
-		}
-		if len(normalizedCourses) == 0 {
-			normalizedCourses = defaults.Courses
+		status := normalizeTaskStatus(task.Status)
+		if status != task.Status {
+			task.Status = status
 			changed = true
 		}
-		data.Courses = normalizedCourses
-
-		courseValid := make(map[string]bool, len(data.Courses))
-		for _, c := range data.Courses {
-			courseValid[c.ID] = true
-		}
-
-		normalizedAssignments := make([]model.Assignment, 0, len(data.Assignments))
-		assignSeen := make(map[string]bool)
-		for i, assignment := range data.Assignments {
-			def := defaults.Assignments[i%len(defaults.Assignments)]
-			if strings.TrimSpace(assignment.ID) == "" {
-				assignment.ID = def.ID
-				changed = true
-			}
-			if strings.TrimSpace(assignment.CourseID) == "" || !courseValid[assignment.CourseID] {
-				assignment.CourseID = def.CourseID
-				changed = true
-			}
-			if strings.TrimSpace(assignment.Name) == "" {
-				assignment.Name = def.Name
-				changed = true
-			}
-			if assignment.DueAt == nil {
-				assignment.DueAt = def.DueAt
-				changed = true
-			}
-			if assignSeen[assignment.ID] {
-				assignment.ID = fmt.Sprintf("%s-%d", def.ID, i+1)
-				changed = true
-			}
-			assignSeen[assignment.ID] = true
-			normalizedAssignments = append(normalizedAssignments, assignment)
-		}
-		if len(normalizedAssignments) == 0 {
-			normalizedAssignments = defaults.Assignments
+		if task.Status != "complete" && task.DueAt != nil && task.DueAt.Before(now) {
+			task.Status = "overdue"
 			changed = true
 		}
-		data.Assignments = normalizedAssignments
+		normalizedTasks = append(normalizedTasks, task)
+	}
+	if len(normalizedTasks) == 0 {
+		normalizedTasks = defaults.Tasks
+		changed = true
+	}
+	data.Tasks = normalizedTasks
 
-		normalizedTasks := make([]model.Task, 0, len(data.Tasks))
-		taskSeen := make(map[string]bool)
-		for i, task := range data.Tasks {
-			def := defaults.Tasks[i%len(defaults.Tasks)]
-			if strings.TrimSpace(task.ID) == "" {
-				task.ID = def.ID
-				changed = true
-			}
-			if taskSeen[task.ID] {
-				task.ID = fmt.Sprintf("%s-%d", def.ID, i+1)
-				changed = true
-			}
-			taskSeen[task.ID] = true
-			if strings.TrimSpace(task.Title) == "" {
-				task.Title = def.Title
-				changed = true
-			}
-			if strings.TrimSpace(task.CourseID) != "" && !courseValid[task.CourseID] {
-				task.CourseID = ""
-				changed = true
-			}
-			if task.DueAt == nil {
-				task.DueAt = def.DueAt
-				changed = true
-			}
-			if task.StartsAt == nil && task.DueAt != nil {
-				start := task.DueAt.Add(-1 * time.Hour)
-				task.StartsAt = &start
-				changed = true
-			}
-
-			status := normalizeTaskStatus(task.Status)
-			if status != task.Status {
-				task.Status = status
-				changed = true
-			}
-			if task.Status != "complete" && task.DueAt != nil && task.DueAt.Before(now) {
-				task.Status = "overdue"
-				changed = true
-			}
-			normalizedTasks = append(normalizedTasks, task)
-		}
-		if len(normalizedTasks) == 0 {
-			normalizedTasks = defaults.Tasks
-			changed = true
-		}
-		data.Tasks = normalizedTasks
-
-		return data, changed
+	return data, changed
 }
 
 func normalizeTaskStatus(status string) string {
 	switch strings.ToLower(strings.TrimSpace(status)) {
-		case "complete", "completed", "done":
-			return "complete"
-		case "overdue":
-			return "overdue"
-		case "in_progress", "in progress", "todo", "to_do", "not_started", "not started", "open", "pending", "":
-			return "in_progress"
-		default:
-			return "in_progress"
+	case "complete", "completed", "done":
+		return "complete"
+	case "overdue":
+		return "overdue"
+	case "in_progress", "in progress", "todo", "to_do", "not_started", "not started", "open", "pending", "":
+		return "in_progress"
+	default:
+		return "in_progress"
 	}
 }
