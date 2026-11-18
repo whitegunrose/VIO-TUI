@@ -387,7 +387,13 @@ func assignmentsDue(data *model.AppData, d time.Time) []string {
 	var items []due
 	for _, a := range data.Assignments {
 		if a.DueAt != nil && sameDay(*a.DueAt, d) {
-			items = append(items, due{a.Name, *a.DueAt})
+			name := a.Name
+			if a.Done() {
+				name = "✓ " + name
+			} else if a.NeedsAttention(time.Now()) {
+				name = "! " + name
+			}
+			items = append(items, due{name, *a.DueAt})
 		}
 	}
 	sort.Slice(items, func(i, j int) bool { return items[i].at.Before(items[j].at) })

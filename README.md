@@ -165,6 +165,7 @@ The dashboard shows five panels, each with a quick summary:
 |---------------|----------------------------------------|
 | `1` – `5`     | Focus a panel                          |
 | `Enter`       | Open the focused panel full-screen     |
+| `a`           | Open Assignments                       |
 | `c`           | Open Canvas settings                   |
 | `q`           | Quit VIO                               |
 
@@ -175,7 +176,16 @@ The dashboard shows five panels, each with a quick summary:
 | `Esc`           | Return to the dashboard                        |
 | `←` / `→`       | *(Calendar)* Previous / next day               |
 | `↑` / `↓`       | *(Calendar)* Previous / next week              |
-| `p` / `n`       | *(Calendar)* Previous / next month             |
+| `p` / `n`       | *(Calendar)* Previous / next week or month     |
+| `Enter`         | Open the selected item's detail page           |
+| `+` / `e` / `-` | Add / edit / remove (tasks, manual assignments) |
+| `x`             | Mark a task done / not done                    |
+| `←` / `→`       | *(Day schedule)* Previous / next day           |
+| `s`             | *(Assignments)* Show / hide submitted          |
+
+Due-date fields accept short forms like `fri 5pm`, `tomorrow`, `+3d`, `next tue noon` or `11/20`, and show how they'll be read as you type.
+
+The dashboard header shows Canvas sync status (*synced 3m ago*, *offline*, *sync failed*). Assignments that Canvas marks missing, or that are past due without a submission, are flagged in red; submitted ones are hidden from summaries.
 
 ### Canvas sync
 
@@ -190,11 +200,11 @@ Use `Tab` / `Shift+Tab` to move between fields, then select **Save**. VIO syncs 
 Sync pulls your **active** courses and their assignments:
 
 - Courses are merged, so anything you've added yourself (location, meeting times, notes) is kept.
-- Assignments are **replaced** with Canvas's list on every sync, so local edits to assignments will be overwritten.
+- Canvas assignments are **replaced** with Canvas's list on every sync and are read-only in VIO. Assignments you add yourself with `+` are kept.
 
 ### Editing your data
 
-There's no in-app editor yet. To add tasks, set your name and school, or fill in class locations and meeting times, edit `data.json` (see [Where your data lives](#where-your-data-lives)) while VIO is closed. VIO cleans the file up on load — filling in missing fields, removing duplicate IDs, and marking past-due tasks as `overdue`. Valid task statuses are `in_progress`, `complete`, and `overdue`.
+Tasks, manual assignments, notes and class meeting times can all be edited in the app. To set your name and school, edit `data.json` (see [Where your data lives](#where-your-data-lives)) while VIO is closed. VIO cleans the file up on load — filling in missing fields, removing duplicate IDs, and marking past-due tasks as `overdue`. Valid task statuses are `in_progress`, `complete`, and `overdue`.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
 

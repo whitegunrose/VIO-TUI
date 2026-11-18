@@ -11,8 +11,9 @@ import (
 	"github.com/rivo/tview"
 )
 
-// BuildMainWidgets returns the list of box widgets and the main layout.
-func BuildMainWidgets(data *model.AppData) ([]tview.Primitive, *tview.Flex) {
+// BuildMainWidgets returns the list of box widgets, the main layout, and
+// the Canvas sync status line shown in the header.
+func BuildMainWidgets(data *model.AppData) ([]tview.Primitive, *tview.Flex, *SyncStatus) {
 
 	// Widgets
 
@@ -62,10 +63,13 @@ func BuildMainWidgets(data *model.AppData) ([]tview.Primitive, *tview.Flex) {
 		SetTextAlign(tview.AlignCenter).
 		SetText("[white::b][ q ] To QUIT    [ c ] Canvas Settings\n[ a ] Assignments")
 
+	status := newSyncStatus()
+
 	quit := tview.NewFlex().
 		SetDirection(tview.FlexRow).
-		AddItem(quitPadding, 2, 1, false).
-		AddItem(quitText, 0, 2, false)
+		AddItem(quitPadding, 1, 0, false).
+		AddItem(quitText, 2, 0, false).
+		AddItem(status.view, 1, 0, false)
 
 	title := tview.NewTextView().
 		SetTextAlign(tview.AlignLeft).
@@ -88,33 +92,57 @@ __     __   _     ____
 		AddItem(mainBody, 0, 1, false)
 
 	widgets := []tview.Primitive{wCalendar, wCourses, wTodo, wSchedule, wNotes}
-	return widgets, flex
+	return widgets, flex, status
 }
 
 func buildCalendarSummary(data *model.AppData) string {
 	now := time.Now()
-	var dueLines []string
+	type due struct {
+		at   time.Time
+		line string
+	}
+	var items []due
+	missing := 0
 
 	for _, assignment := range data.Assignments {
-		if assignment.DueAt == nil {
+		if assignment.NeedsAttention(now) {
+			missing++
+		}
+		if assignment.DueAt == nil || assignment.Done() {
 			continue
 		}
-		if assignment.DueAt.Month() != now.Month() || assignment.DueAt.Year() != now.Year() {
+		at := assignment.DueAt.In(time.Local)
+		if at.Month() != now.Month() || at.Year() != now.Year() {
 			continue
 		}
-		dueLines = append(dueLines, fmt.Sprintf("%02d  %s", assignment.DueAt.Day(), assignment.Name))
+		line := fmt.Sprintf("%02d  %s", at.Day(), tview.Escape(assignment.Name))
+		if assignment.NeedsAttention(now) {
+			line = theme.TagRed + line + theme.TagReset
+		} else if at.Before(now) {
+			line = theme.TagMuted + line + theme.TagReset
+		}
+		items = append(items, due{at, line})
 	}
 
-	sort.Strings(dueLines)
+	sort.Slice(items, func(i, j int) bool { return items[i].at.Before(items[j].at) })
 
-	if len(dueLines) == 0 {
-		return fmt.Sprintf("%s\n\nNo assignment due dates this month yet.", now.Month())
-	}
-	if len(dueLines) > 8 {
-		dueLines = dueLines[:8]
+	head := theme.TagBold + now.Month().String() + theme.TagReset
+	if missing > 0 {
+		head += fmt.Sprintf("   %s● %d need attention%s %s(a)%s", theme.TagRed, missing, theme.TagReset, theme.TagMuted, theme.TagReset)
 	}
 
-	return fmt.Sprintf("%s\n\n%s", now.Month(), strings.Join(dueLines, "\n"))
+	if len(items) == 0 {
+		return head + "\n\n" + theme.TagMuted + "Nothing left to submit this month." + theme.TagReset
+	}
+	if len(items) > 8 {
+		items = items[:8]
+	}
+	lines := make([]string, len(items))
+	for i, it := range items {
+		lines[i] = it.line
+	}
+
+	return head + "\n\n" + strings.Join(lines, "\n")
 }
 
 func buildCoursesSummary(data *model.AppData) string {
@@ -130,6 +158,14 @@ func buildCoursesSummary(data *model.AppData) string {
 			continue
 		}
 		lines = append(lines, fmt.Sprintf("%s%s%s\n%s%s%s", theme.TagBold, name, theme.TagReset, theme.TagMuted, tview.Escape(course.Code), theme.TagReset))
+	}
+
+	if n := len(model.MeetingConflicts(data.Courses)); n > 0 {
+		plural := "s"
+		if n == 1 {
+			plural = ""
+		}
+		lines = append(lines, fmt.Sprintf("%s⚠ %d class time overlap%s%s", theme.TagYellow, n, plural, theme.TagReset))
 	}
 
 	return strings.Join(lines, "\n\n")
@@ -169,30 +205,51 @@ func dashboardTaskStatus(task model.Task) string {
 	return "in_progress"
 }
 
+// buildScheduleSummary lists today's classes, assignments and tasks in
+// time order, dimming what's already over.
 func buildScheduleSummary(data *model.AppData) string {
-	today := time.Now()
+	now := time.Now()
+	items := data.Agenda(now, false)
+	if len(items) == 0 {
+		return theme.TagMuted + "Nothing scheduled today." + theme.TagReset
+	}
+
 	var lines []string
-
-	for _, assignment := range data.Assignments {
-		if assignment.DueAt == nil {
-			continue
+	for _, it := range items {
+		color := theme.TagMuted
+		if it.CourseIndex >= 0 {
+			color = theme.ColorTag(theme.CourseColor(it.CourseIndex))
 		}
-
-		due := assignment.DueAt.In(time.Local)
-		if sameLocalDay(due, today) {
-			lines = append(lines, fmt.Sprintf(
-				"%s\n%s",
-				assignment.Name,
-				due.Format("3:04 PM"),
-			))
+		var when, what string
+		past := it.At.Before(now)
+		switch it.Kind {
+		case model.ItemClass:
+			when = it.At.Format("3:04") + "–" + it.End.Format("3:04 PM")
+			what = color + "▌ " + theme.TagReset + theme.TagBold + tview.Escape(it.Title) + theme.TagReset
+			if it.Location != "" {
+				what += theme.TagMuted + " @ " + tview.Escape(it.Location) + theme.TagReset
+			}
+			past = it.End.Before(now)
+		case model.ItemAssignment:
+			when = "due " + it.At.Format("3:04 PM")
+			what = theme.TagRed + "● " + theme.TagReset + tview.Escape(it.Title)
+		case model.ItemTask:
+			when = "due " + it.At.Format("3:04 PM")
+			mark := theme.TagYellow + "● " + theme.TagReset
+			if strings.EqualFold(data.Tasks[it.Index].Status, "complete") {
+				mark = theme.TagGreen + "✓ " + theme.TagReset
+				past = true
+			}
+			what = mark + tview.Escape(it.Title)
 		}
+		line := theme.TagMuted + fmt.Sprintf("%-16s", when) + theme.TagReset + what
+		if past {
+			line = theme.TagMuted + fmt.Sprintf("%-16s", when) + tview.Escape(it.Title) + theme.TagReset
+		}
+		lines = append(lines, line)
 	}
 
-	if len(lines) == 0 {
-		return "Nothing due today."
-	}
-
-	return strings.Join(lines, "\n\n")
+	return strings.Join(lines, "\n")
 }
 
 // Most recent notes: titles in a list, then the newest note's first lines
@@ -265,12 +322,4 @@ func RefreshMainWidgets(widgets []tview.Primitive, data *model.AppData) {
 	if tv, ok := widgets[4].(*tview.TextView); ok {
 		tv.SetText(buildNotesSummary(data))
 	}
-}
-
-func sameLocalDay(a, b time.Time) bool {
-	la := a.In(time.Local)
-	lb := b.In(time.Local)
-	ay, am, ad := la.Date()
-	by, bm, bd := lb.Date()
-	return ay == by && am == bm && ad == bd
 }

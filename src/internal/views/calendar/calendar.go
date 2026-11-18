@@ -371,8 +371,21 @@ func renderSelectedDayItems(data *model.AppData, state *calendarState) string {
 	var due []string
 	for _, a := range data.Assignments {
 		if a.DueAt != nil && sameDay(*a.DueAt, selected) {
-			due = append(due, theme.TagRed+"● "+theme.TagReset+tview.Escape(a.Name)+
-				"\n  "+theme.TagMuted+"due "+a.DueAt.In(time.Local).Format("3:04 PM")+theme.TagReset)
+			mark, name := theme.TagRed+"● "+theme.TagReset, tview.Escape(a.Name)
+			state := ""
+			switch a.State(time.Now()) {
+			case model.AssignmentSubmitted:
+				mark, name = theme.TagGreen+"✓ "+theme.TagReset, theme.TagMuted+name+theme.TagReset
+				state = " · submitted"
+			case model.AssignmentLate:
+				mark, state = theme.TagYellow+"✓ "+theme.TagReset, " · submitted late"
+			case model.AssignmentMissing:
+				state = " · " + theme.TagRed + "MISSING" + theme.TagMuted
+			case model.AssignmentOverdue:
+				state = " · " + theme.TagRed + "past due" + theme.TagMuted
+			}
+			due = append(due, mark+name+
+				"\n  "+theme.TagMuted+"due "+a.DueAt.In(time.Local).Format("3:04 PM")+state+theme.TagReset)
 		}
 	}
 	for _, t := range data.Tasks {

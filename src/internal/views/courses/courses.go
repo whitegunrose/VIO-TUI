@@ -101,7 +101,7 @@ func CoursesPage(app *tview.Application, data *model.AppData, returnTo func()) t
 		AddItem(right, 0, 5, false).
 		AddItem(tview.NewBox(), 0, 1, false)
 
-	listHelp := theme.KeyHints("j/k", "select", "m", "edit meeting times", "g/G", "top/bottom", "esc", "back")
+	listHelp := theme.KeyHints("j/k", "select", "enter", "open", "m", "edit meeting times", "g/G", "top/bottom", "esc", "back")
 	editHelp := theme.KeyHints("esc", "save", "ctrl+x", "discard") +
 		theme.TagMuted + "one meeting per line: days  start - end  @ room" + theme.TagReset
 
@@ -157,7 +157,20 @@ func CoursesPage(app *tview.Application, data *model.AppData, returnTo func()) t
 		showDetail(list.GetCurrentItem())
 	}
 
-	list.SetSelectedFunc(func(int, string, string, rune) { startEdit() })
+	openDetail := func() {
+		i := list.GetCurrentItem()
+		if i < 0 || i >= len(data.Courses) {
+			return
+		}
+		back := func() { app.SetRoot(page, true).SetFocus(list) }
+		detailPage := CourseDetailPage(data, i, func() {
+			back()
+			startEdit()
+		}, back)
+		app.SetRoot(detailPage, true).SetFocus(detailPage)
+	}
+
+	list.SetSelectedFunc(func(int, string, string, rune) { openDetail() })
 
 	list.SetInputCapture(func(event *tcell.EventKey) *tcell.EventKey {
 		switch event.Key() {
@@ -242,6 +255,7 @@ func renderCourseDetail(data *model.AppData, i int) string {
 		}
 		b.WriteString("\n")
 	}
+	b.WriteString(conflictLines(data, i))
 	for _, legacy := range course.MeetingTimes {
 		b.WriteString(theme.TagMuted + "Couldn't read: " + tview.Escape(legacy) + theme.TagReset + "\n")
 	}

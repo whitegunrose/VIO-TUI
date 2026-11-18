@@ -38,6 +38,54 @@ type Assignment struct {
 	IsLate         bool       `json:"is_late"`
 	PointsPossible float64    `json:"points_possible,omitempty"`
 	CanvasID       int        `json:"canvas_id,omitempty"`
+
+	// Manual assignments are added in VIO (not from Canvas). They can be
+	// edited and deleted, and Canvas sync keeps them.
+	Manual bool `json:"manual,omitempty"`
+}
+
+// Assignment states, from most to least urgent.
+const (
+	AssignmentMissing   = "missing"
+	AssignmentLate      = "late"
+	AssignmentOverdue   = "overdue"
+	AssignmentOpen      = "open"
+	AssignmentSubmitted = "submitted"
+)
+
+// State sums up Canvas's submission flags (and the due date) into one
+// label. Canvas's own missing/late flags win; an unsubmitted assignment
+// past its due date is "overdue" even when Canvas hasn't flagged it.
+func (a Assignment) State(now time.Time) string {
+	switch {
+	case a.IsMissing:
+		return AssignmentMissing
+	case a.HasSubmitted && a.IsLate:
+		return AssignmentLate
+	case a.HasSubmitted:
+		return AssignmentSubmitted
+	case a.IsLate:
+		return AssignmentLate
+	case a.DueAt != nil && a.DueAt.Before(now):
+		return AssignmentOverdue
+	default:
+		return AssignmentOpen
+	}
+}
+
+// Done reports whether the assignment needs no more work.
+func (a Assignment) Done() bool {
+	return a.HasSubmitted
+}
+
+// NeedsAttention reports whether the assignment is missing or past due
+// without a submission.
+func (a Assignment) NeedsAttention(now time.Time) bool {
+	switch a.State(now) {
+	case AssignmentMissing, AssignmentOverdue:
+		return true
+	}
+	return false
 }
 
 // Task data

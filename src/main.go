@@ -35,7 +35,18 @@ func main() {
 	app := tview.NewApplication()
 
 	// Grab dashboard widgets
-	mainWidgets, flex := widgets.BuildMainWidgets(data)
+	mainWidgets, flex, syncStatus := widgets.BuildMainWidgets(data)
+	syncStatus.SetConfigured(canvasCfg.HasCredentials())
+
+	// Keep "synced 3m ago" and the Today panel current while VIO stays open
+	go func() {
+		for range time.Tick(30 * time.Second) {
+			app.QueueUpdateDraw(func() {
+				syncStatus.Refresh()
+				widgets.RefreshMainWidgets(mainWidgets, data)
+			})
+		}
+	}()
 
 	var mu sync.Mutex
 	lastSyncStatus := "Canvas sync is optional. Press [white::b]c[::-] from the dashboard to configure it."
@@ -51,21 +62,36 @@ func main() {
 			return
 		}
 
+		// QueueUpdateDraw blocks until the event loop runs the update, so it
+		// must only be called from this goroutine: syncNow itself runs before
+		// app.Run() at startup and on the UI thread when settings are saved.
 		go func() {
-			updated, err := canvas.SyncCoursesAndAssignments(cfg, *data)
+			app.QueueUpdateDraw(syncStatus.Started)
+
+			mu.Lock()
+			snapshot := *data
+			mu.Unlock()
+			updated, err := canvas.SyncCoursesAndAssignments(cfg, snapshot)
 			app.QueueUpdateDraw(func() {
 				mu.Lock()
 				defer mu.Unlock()
 
+				syncStatus.Finished(err, time.Now())
 				if err != nil {
-					lastSyncStatus = fmt.Sprintf("[red]Canvas sync failed:[-] %v", err)
+					if widgets.IsOffline(err) {
+						lastSyncStatus = fmt.Sprintf("[yellow]Canvas is unreachable (offline?):[-] %v", err)
+					} else {
+						lastSyncStatus = fmt.Sprintf("[red]Canvas sync failed:[-] %v", err)
+					}
 					return
 				}
 
-				// Sync only touches courses and assignments; keep tasks and notes edited since it started
+				// Sync only touches courses and assignments; keep tasks, notes and
+				// manual assignments edited since it started
 				updated.Tasks = data.Tasks
 				updated.Notes = data.Notes
 				updated.Courses = canvas.MergeCourses(data.Courses, updated.Courses)
+				updated.Assignments = canvas.KeepManual(updated.Assignments, data.Assignments)
 				*data = updated
 
 				if err := store.SaveAppData(*data); err != nil {
@@ -85,6 +111,7 @@ func main() {
 			close(stopPolling)
 		}
 
+		syncStatus.SetConfigured(canvasCfg.HasCredentials())
 		if !canvasCfg.HasCredentials() {
 			stopPolling = nil
 			return

@@ -330,3 +330,55 @@ func ShortCode(code, name string) string {
 	}
 	return strings.TrimSpace(code)
 }
+
+// Conflict is two class meetings that overlap on the same weekday.
+type Conflict struct {
+	Day        string // "Tue"
+	CourseA    int    // index into the courses slice
+	CourseB    int
+	MeetingA   Meeting
+	MeetingB   Meeting
+	Start, End int // the overlapping minutes
+}
+
+// MeetingConflicts finds every pair of meetings (across all courses, or
+// within one) that overlap on a shared day. Back-to-back classes, where one
+// ends as the next starts, don't count.
+func MeetingConflicts(courses []Course) []Conflict {
+	type slot struct {
+		course     int
+		meeting    Meeting
+		start, end int
+	}
+	byDay := map[string][]slot{}
+	for ci, c := range courses {
+		for _, m := range c.Meetings {
+			s, e, ok := m.Minutes()
+			if !ok {
+				continue
+			}
+			for _, d := range m.Days {
+				byDay[d] = append(byDay[d], slot{ci, m, s, e})
+			}
+		}
+	}
+
+	var out []Conflict
+	for _, day := range dayOrder {
+		slots := byDay[day]
+		for i := 0; i < len(slots); i++ {
+			for j := i + 1; j < len(slots); j++ {
+				a, b := slots[i], slots[j]
+				start, end := max(a.start, b.start), min(a.end, b.end)
+				if start < end {
+					out = append(out, Conflict{
+						Day: day, CourseA: a.course, CourseB: b.course,
+						MeetingA: a.meeting, MeetingB: b.meeting,
+						Start: start, End: end,
+					})
+				}
+			}
+		}
+	}
+	return out
+}

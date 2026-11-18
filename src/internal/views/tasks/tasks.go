@@ -74,7 +74,7 @@ func TasksPage(app *tview.Application, data *model.AppData, returnTo func()) tvi
 		AddItem(tview.NewBox(), 0, 1, false)
 
 	// Footer below all 3 task columns
-	const footerHelp = "[ < > ] SWITCH COLUMN   [ ^ v ] SELECT   [ + ] ADD   [ - ] REMOVE   [ E ] EDIT"
+	const footerHelp = "[ < > ] SWITCH COLUMN   [ ^ v ] SELECT   [ ENTER ] OPEN   [ + ] ADD   [ - ] REMOVE   [ E ] EDIT   [ X ] DONE"
 	footer := tview.NewTextView().
 		SetTextAlign(tview.AlignCenter).
 		SetDynamicColors(true).
@@ -157,7 +157,7 @@ func TasksPage(app *tview.Application, data *model.AppData, returnTo func()) tvi
 			formTitle = "[ EDIT TASK ]"
 		}
 
-		form := taskForm(data, task, formTitle, func(saved model.Task) {
+		form := TaskForm(data, task, formTitle, func(saved model.Task) {
 			if index >= 0 {
 				data.Tasks[index] = saved
 			} else {
@@ -203,7 +203,13 @@ func TasksPage(app *tview.Application, data *model.AppData, returnTo func()) tvi
 			return nil
 		case tcell.KeyEnter:
 			if index := selectedTask(); index >= 0 {
-				openForm(index)
+				id := data.Tasks[index].ID
+				detailPage := TaskDetailPage(app, data, id, func() {
+					render()
+					selectByID(id)
+					showPage()
+				})
+				app.SetRoot(detailPage, true).SetFocus(detailPage)
 			}
 			return nil
 		case tcell.KeyRune:
@@ -219,6 +225,16 @@ func TasksPage(app *tview.Application, data *model.AppData, returnTo func()) tvi
 			case 'e', 'E':
 				if index := selectedTask(); index >= 0 {
 					openForm(index)
+				}
+				return nil
+			case 'x', 'X', ' ':
+				if index := selectedTask(); index >= 0 {
+					id := data.Tasks[index].ID
+					ToggleComplete(&data.Tasks[index])
+					persist()
+					render()
+					selectByID(id)
+					focusColumn(focused)
 				}
 				return nil
 			}

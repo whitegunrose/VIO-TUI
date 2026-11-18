@@ -262,3 +262,20 @@ func toLocalTimePtr(t *time.Time) *time.Time {
 	local := t.In(time.Local)
 	return &local
 }
+
+// KeepManual returns the synced Canvas assignments plus every manual
+// assignment from local, since sync replaces the assignment list.
+func KeepManual(synced, local []model.Assignment) []model.Assignment {
+	out := make([]model.Assignment, 0, len(synced)+len(local))
+	for _, a := range synced {
+		if !a.Manual {
+			out = append(out, a)
+		}
+	}
+	for _, a := range local {
+		if a.Manual {
+			out = append(out, a)
+		}
+	}
+	return out
+}
