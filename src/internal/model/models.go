@@ -18,9 +18,10 @@ type Course struct {
 	Workflow string `json:"workflow_state,omitempty"`
 
 	// from user input
-	Location     string   `json:"location,omitempty"`
-	MeetingTimes []string `json:"meeting_times,omitempty"`
-	Notes        string   `json:"notes,omitempty"`
+	Location     string    `json:"location,omitempty"`
+	Meetings     []Meeting `json:"meetings,omitempty"`
+	MeetingTimes []string  `json:"meeting_times,omitempty"` // legacy "Mon 12:34 PM" strings, migrated to Meetings on load
+	Notes        string    `json:"notes,omitempty"`
 }
 
 // Assignment data

@@ -17,10 +17,39 @@ var (
 	ColMuted   = tcell.NewHexColor(0x565f89)
 	ColAccent  = tcell.NewHexColor(0x7aa2f7) // focus, headings
 	ColKey     = tcell.NewHexColor(0xbb9af7) // key hints, tags
+	ColRed     = tcell.NewHexColor(0xf7768e)
+	ColYellow  = tcell.NewHexColor(0xe0af68)
+	ColDark    = tcell.NewHexColor(0x1a1b26) // text on accent backgrounds
 )
+
+// CourseColors gives each course its own color, in course order.
+var CourseColors = []tcell.Color{
+	tcell.NewHexColor(0x7aa2f7), // blue
+	tcell.NewHexColor(0x9ece6a), // green
+	tcell.NewHexColor(0xbb9af7), // purple
+	tcell.NewHexColor(0xff9e64), // orange
+	tcell.NewHexColor(0x7dcfff), // cyan
+	tcell.NewHexColor(0xf7768e), // pink
+	tcell.NewHexColor(0x73daca), // teal
+	tcell.NewHexColor(0xe0af68), // yellow
+}
+
+// CourseColor returns the color for the course at index i in data.Courses.
+func CourseColor(i int) tcell.Color {
+	if i < 0 {
+		i = -i
+	}
+	return CourseColors[i%len(CourseColors)]
+}
+
+// ColorTag turns a color into a tview tag like "[#7aa2f7]".
+func ColorTag(c tcell.Color) string {
+	return fmt.Sprintf("[#%06x]", c.Hex())
+}
 
 // Color tags for TextViews with SetDynamicColors(true).
 const (
+	TagBorder = "[#3b4261]"
 	TagMuted  = "[#565f89]"
 	TagAccent = "[#7aa2f7]"
 	TagKey    = "[#bb9af7]"
@@ -68,6 +97,16 @@ func StylePane(box *tview.Box, n int, name string) {
 		SetTitleAlign(tview.AlignLeft).
 		SetBorderPadding(0, 0, 1, 1)
 	SetPaneFocus(box, false)
+}
+
+// FramePanel gives any page panel the dashboard frame: rounded border and
+// a left-aligned " Title " that is accent-colored while focused.
+func FramePanel(box *tview.Box, title string, focused bool) {
+	box.SetBorder(true).
+		SetTitle(" "+title+" ").
+		SetTitleAlign(tview.AlignLeft).
+		SetBorderPadding(0, 0, 1, 1)
+	SetPaneFocus(box, focused)
 }
 
 // SetPaneFocus colors a panel's frame for the focused or unfocused state.

@@ -119,24 +119,24 @@ func defaultAppData() model.AppData {
 		},
 		Courses: []model.Course{
 			{
-				ID:           "comp123",
-				Name:         "Introduction to Computer",
-				Code:         "COMP 123",
-				Term:         "Spring 2032",
-				CanvasID:     12345,
-				Workflow:     "available",
-				Location:     "JD 1234",
-				MeetingTimes: []string{"Mon 12:34 PM", "Wed 12:34 PM"},
+				ID:       "comp123",
+				Name:     "Introduction to Computer",
+				Code:     "COMP 123",
+				Term:     "Spring 2032",
+				CanvasID: 12345,
+				Workflow: "available",
+				Location: "JD 1234",
+				Meetings: []model.Meeting{{Days: []string{"Mon", "Wed"}, Start: "12:30", End: "13:45", Location: "JD 1234"}},
 			},
 			{
-				ID:           "comp456",
-				Name:         "Analysis of Computer",
-				Code:         "COMP 456",
-				Term:         "Spring 2032",
-				CanvasID:     67890,
-				Workflow:     "available",
-				Location:     "JD 5678",
-				MeetingTimes: []string{"Tue 10:23 AM", "Thu 10:23 AM"},
+				ID:       "comp456",
+				Name:     "Analysis of Computer",
+				Code:     "COMP 456",
+				Term:     "Spring 2032",
+				CanvasID: 67890,
+				Workflow: "available",
+				Location: "JD 5678",
+				Meetings: []model.Meeting{{Days: []string{"Tue", "Thu"}, Start: "10:00", End: "11:15", Location: "JD 5678"}},
 			},
 		},
 		Assignments: []model.Assignment{
@@ -217,6 +217,20 @@ func normalizeAppData(data model.AppData) (model.AppData, bool) {
 		}
 		if courseSeen[course.ID] {
 			course.ID = fmt.Sprintf("%s-%d", def.ID, i+1)
+			changed = true
+		}
+		// Convert old "Mon 12:34 PM" strings to structured meetings; keep any
+		// string that can't be read so nothing is silently lost
+		if len(course.MeetingTimes) > 0 {
+			var unread []string
+			for _, legacy := range course.MeetingTimes {
+				if m, ok := model.MeetingFromLegacy(legacy); ok {
+					course.Meetings = append(course.Meetings, m)
+				} else {
+					unread = append(unread, legacy)
+				}
+			}
+			course.MeetingTimes = unread
 			changed = true
 		}
 		courseSeen[course.ID] = true

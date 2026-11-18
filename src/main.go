@@ -65,6 +65,7 @@ func main() {
 				// Sync only touches courses and assignments; keep tasks and notes edited since it started
 				updated.Tasks = data.Tasks
 				updated.Notes = data.Notes
+				updated.Courses = canvas.MergeCourses(data.Courses, updated.Courses)
 				*data = updated
 
 				if err := store.SaveAppData(*data); err != nil {

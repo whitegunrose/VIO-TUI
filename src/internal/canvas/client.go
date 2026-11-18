@@ -213,6 +213,13 @@ func canvasAssignmentKey(id int) string {
 	return "canvas-assignment-" + strconv.Itoa(id)
 }
 
+// MergeCourses keeps the user-entered fields (location, meetings, notes)
+// from existing on matching courses in fresh. main.go uses it to reapply
+// edits made while a sync was in flight.
+func MergeCourses(existing []model.Course, fresh []model.Course) []model.Course {
+	return mergeCourses(existing, fresh)
+}
+
 // Replace Canvas-relevent fields but not user-made ones
 func mergeCourses(existing []model.Course, fresh []model.Course) []model.Course {
 	existingByCanvasID := make(map[int]model.Course, len(existing))
@@ -224,6 +231,7 @@ func mergeCourses(existing []model.Course, fresh []model.Course) []model.Course 
 	for _, course := range fresh {
 		if old, ok := existingByCanvasID[course.CanvasID]; ok {
 			course.Location = old.Location
+			course.Meetings = old.Meetings
 			course.MeetingTimes = old.MeetingTimes
 			course.Notes = old.Notes
 		}
