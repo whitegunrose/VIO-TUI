@@ -50,10 +50,21 @@ type Task struct {
 	Description string     `json:"description,omitempty"`
 }
 
+// Note data: free-form text written in the notes page. The first line
+// of Body becomes Title. CourseID optionally links the note to a course.
+type Note struct {
+	ID        string    `json:"id"`
+	Title     string    `json:"title"`
+	Body      string    `json:"body"`
+	CourseID  string    `json:"course_id,omitempty"`
+	UpdatedAt time.Time `json:"updated_at"`
+}
+
 // Main source of info for pages to pull from
 type AppData struct {
 	Student     Student      `json:"student"`
 	Courses     []Course     `json:"courses"`
 	Assignments []Assignment `json:"assignments"`
 	Tasks       []Task       `json:"tasks"`
+	Notes       []Note       `json:"notes"`
 }

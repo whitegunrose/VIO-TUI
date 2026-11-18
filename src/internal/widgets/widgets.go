@@ -2,6 +2,7 @@ package widgets
 
 import (
 	"VIO/internal/model"
+	"VIO/internal/theme"
 	"fmt"
 	"sort"
 	"strings"
@@ -16,31 +17,23 @@ func BuildMainWidgets(data *model.AppData) ([]tview.Primitive, *tview.Flex) {
 	// Widgets
 
 	// Dashboard panels
-	wCalendar := tview.NewTextView().SetDynamicColors(true)
-	wCalendar.SetBorder(true)
-	wCalendar.SetTitle("[ 1 ]")
+	newPanel := func(n int, name string) *tview.TextView {
+		tv := tview.NewTextView().SetDynamicColors(true).SetWrap(true)
+		theme.StylePane(tv.Box, n, name)
+		return tv
+	}
 
-	wCourses := tview.NewTextView().SetDynamicColors(true)
-	wCourses.SetBorder(true)
-	wCourses.SetTitle("[ 2 ]")
-
-	wTodo := tview.NewTextView().SetDynamicColors(true)
-	wTodo.SetBorder(true)
-	wTodo.SetTitle("[ 3 ]")
-
-	wSchedule := tview.NewTextView().SetDynamicColors(true)
-	wSchedule.SetBorder(true)
-	wSchedule.SetTitle("[ 4 ]")
-
-	wAssignments := tview.NewTextView().SetDynamicColors(true)
-	wAssignments.SetBorder(true)
-	wAssignments.SetTitle("[ 5 ]")
+	wCalendar := newPanel(1, "Calendar")
+	wCourses := newPanel(2, "Courses")
+	wTodo := newPanel(3, "Tasks")
+	wSchedule := newPanel(4, "Today")
+	wNotes := newPanel(5, "Notes")
 
 	wCalendar.SetText(buildCalendarSummary(data))
 	wCourses.SetText(buildCoursesSummary(data))
 	wTodo.SetText(buildTasksSummary(data))
 	wSchedule.SetText(buildScheduleSummary(data))
-	wAssignments.SetText(buildAssignmentsSummary(data))
+	wNotes.SetText(buildNotesSummary(data))
 
 	mainBody := tview.NewFlex().SetDirection(tview.FlexRow).
 		AddItem(tview.NewBox(), 1, 3, false).
@@ -53,7 +46,7 @@ func BuildMainWidgets(data *model.AppData) ([]tview.Primitive, *tview.Flex) {
 		AddItem(
 			tview.NewFlex().SetDirection(tview.FlexColumn).
 				AddItem(wSchedule, 0, 1, false).
-				AddItem(wAssignments, 0, 1, false),
+				AddItem(wNotes, 0, 1, false),
 			0, 1, false)
 
 	quitPadding := tview.NewTextView().
@@ -67,7 +60,7 @@ func BuildMainWidgets(data *model.AppData) ([]tview.Primitive, *tview.Flex) {
 	quitText := tview.NewTextView().
 		SetDynamicColors(true).
 		SetTextAlign(tview.AlignCenter).
-		SetText("[white::b][ q ] To QUIT    [ c ] Canvas Settings")
+		SetText("[white::b][ q ] To QUIT    [ c ] Canvas Settings\n[ a ] Assignments")
 
 	quit := tview.NewFlex().
 		SetDirection(tview.FlexRow).
@@ -94,7 +87,7 @@ __     __   _     ____
 		AddItem(header, 5, 0, false).
 		AddItem(mainBody, 0, 1, false)
 
-	widgets := []tview.Primitive{wCalendar, wCourses, wTodo, wSchedule, wAssignments}
+	widgets := []tview.Primitive{wCalendar, wCourses, wTodo, wSchedule, wNotes}
 	return widgets, flex
 }
 
@@ -126,12 +119,17 @@ func buildCalendarSummary(data *model.AppData) string {
 
 func buildCoursesSummary(data *model.AppData) string {
 	if len(data.Courses) == 0 {
-		return "Courses\n\nNo courses loaded."
+		return "No courses loaded."
 	}
 
 	var lines []string
 	for _, course := range data.Courses {
-		lines = append(lines, fmt.Sprintf("%s\n%s", course.Code, course.Name))
+		name := tview.Escape(course.Name)
+		if strings.TrimSpace(course.Code) == "" || strings.EqualFold(strings.TrimSpace(course.Code), strings.TrimSpace(course.Name)) {
+			lines = append(lines, theme.TagBold+name+theme.TagReset)
+			continue
+		}
+		lines = append(lines, fmt.Sprintf("%s%s%s\n%s%s%s", theme.TagBold, name, theme.TagReset, theme.TagMuted, tview.Escape(course.Code), theme.TagReset))
 	}
 
 	return strings.Join(lines, "\n\n")
@@ -139,7 +137,7 @@ func buildCoursesSummary(data *model.AppData) string {
 
 func buildTasksSummary(data *model.AppData) string {
 	if len(data.Tasks) == 0 {
-		return "Tasks\n\nNo personal tasks yet."
+		return "No personal tasks yet."
 	}
 
 	counts := map[string]int{
@@ -191,49 +189,59 @@ func buildScheduleSummary(data *model.AppData) string {
 	}
 
 	if len(lines) == 0 {
-		return "Today\n\nNothing due today."
+		return "Nothing due today."
 	}
 
 	return strings.Join(lines, "\n\n")
 }
 
-func buildAssignmentsSummary(data *model.AppData) string {
-	now := time.Now()
-	assignments := make([]model.Assignment, 0)
-
-	for _, assignment := range data.Assignments {
-		if assignment.DueAt == nil {
-			continue
-		}
-		due := assignment.DueAt.In(time.Local)
-		if due.After(now) {
-			assignments = append(assignments, assignment)
-		}
+// Most recent notes: titles in a list, then the newest note's first lines
+func buildNotesSummary(data *model.AppData) string {
+	if len(data.Notes) == 0 {
+		return theme.TagMuted + "No notes yet.\n\nPress 5 then Enter to open notes, n to write one." + theme.TagReset
 	}
 
-	sort.Slice(assignments, func(i, j int) bool {
-		return assignments[i].DueAt.In(time.Local).Before(assignments[j].DueAt.In(time.Local))
+	notes := make([]model.Note, len(data.Notes))
+	copy(notes, data.Notes)
+	sort.SliceStable(notes, func(i, j int) bool {
+		return notes[i].UpdatedAt.After(notes[j].UpdatedAt)
 	})
 
 	var lines []string
-	for _, assignment := range assignments {
-		due := assignment.DueAt.In(time.Local)
-		lines = append(lines, fmt.Sprintf(
-			"%s\n%s",
-			assignment.Name,
-			due.Format("Mon 1/2 3:04 PM"),
-		))
+	for i, n := range notes {
+		if i == 4 {
+			lines = append(lines, fmt.Sprintf("%s+ %d more%s", theme.TagMuted, len(notes)-4, theme.TagReset))
+			break
+		}
+		marker := theme.TagMuted + "  " + theme.TagReset
+		if i == 0 {
+			marker = theme.TagAccent + "▸ " + theme.TagReset
+		}
+		lines = append(lines, marker+tview.Escape(n.Title))
+	}
 
-		if len(lines) == 3 {
+	// Preview of the newest note's body, skipping the first line (it's the title)
+	body := strings.Split(strings.TrimSpace(notes[0].Body), "\n")[1:]
+	var preview []string
+	for _, l := range body {
+		t := strings.TrimSpace(l)
+		if t == "" {
+			continue
+		}
+		if strings.HasPrefix(t, "- ") || strings.HasPrefix(t, "* ") {
+			t = "• " + t[2:]
+		}
+		preview = append(preview, theme.TagMuted+tview.Escape(t)+theme.TagReset)
+		if len(preview) == 4 {
 			break
 		}
 	}
-
-	if len(lines) == 0 {
-		return "Assignments\n\nNo upcoming assignments."
+	if len(preview) > 0 {
+		lines = append(lines, "")
+		lines = append(lines, preview...)
 	}
 
-	return strings.Join(lines, "\n\n")
+	return strings.Join(lines, "\n")
 }
 
 // Redraw the dashboard panels after sync
@@ -255,7 +263,7 @@ func RefreshMainWidgets(widgets []tview.Primitive, data *model.AppData) {
 		tv.SetText(buildScheduleSummary(data))
 	}
 	if tv, ok := widgets[4].(*tview.TextView); ok {
-		tv.SetText(buildAssignmentsSummary(data))
+		tv.SetText(buildNotesSummary(data))
 	}
 }
 

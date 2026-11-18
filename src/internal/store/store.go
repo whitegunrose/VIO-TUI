@@ -315,6 +315,29 @@ func normalizeAppData(data model.AppData) (model.AppData, bool) {
 	}
 	data.Tasks = normalizedTasks
 
+	// Notes are user-written only: never seeded, so an empty list stays empty
+	normalizedNotes := make([]model.Note, 0, len(data.Notes))
+	noteSeen := make(map[string]bool)
+	for i, note := range data.Notes {
+		if strings.TrimSpace(note.ID) == "" || noteSeen[note.ID] {
+			note.ID = fmt.Sprintf("note-%d-%d", note.UpdatedAt.UnixNano(), i+1)
+			changed = true
+		}
+		noteSeen[note.ID] = true
+		if strings.TrimSpace(note.Title) == "" {
+			note.Title = "Untitled"
+			changed = true
+		}
+		if strings.TrimSpace(note.CourseID) != "" && !courseValid[note.CourseID] {
+			note.CourseID = ""
+			changed = true
+		}
+		normalizedNotes = append(normalizedNotes, note)
+	}
+	if data.Notes != nil {
+		data.Notes = normalizedNotes
+	}
+
 	return data, changed
 }
 

@@ -1,6 +1,8 @@
 package widgets
 
 import (
+	"VIO/internal/theme"
+
 	"github.com/gdamore/tcell/v2"
 	"github.com/rivo/tview"
 )
@@ -21,15 +23,7 @@ func HandleNavigation(dashboard *tview.Flex, widgets []tview.Primitive, openScre
 				continue
 			}
 
-			if i == index {
-				textView.SetBorderColor(tcell.ColorSpringGreen)
-				textView.SetTitleColor(tcell.ColorSpringGreen)
-				textView.SetBorderAttributes(tcell.AttrBold)
-			} else {
-				textView.SetBorderColor(tcell.ColorWhite)
-				textView.SetTitleColor(tcell.ColorWhite)
-				textView.SetBorderAttributes(tcell.AttrNone)
-			}
+			theme.SetPaneFocus(textView.Box, i == index)
 		}
 	}
 
@@ -44,6 +38,10 @@ func HandleNavigation(dashboard *tview.Flex, widgets []tview.Primitive, openScre
 
 			case 'c', 'C':
 				openCanvasSettings()
+				return nil
+
+			case 'a', 'A': // Assignments page no longer has a dashboard panel
+				openScreen(AssignmentsScreen)
 				return nil
 
 			case '1', '2', '3', '4', '5':

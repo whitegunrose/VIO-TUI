@@ -3,6 +3,7 @@ package main
 import (
 	"VIO/internal/canvas"
 	"VIO/internal/store"
+	"VIO/internal/theme"
 	"VIO/internal/views/settings"
 	"VIO/internal/widgets"
 	"fmt"
@@ -13,6 +14,9 @@ import (
 )
 
 func main() {
+	// Must run before any widget is built
+	theme.ApplyTheme()
+
 	// Load local JSON data
 	data, err := store.LoadAppData()
 	if err != nil {
@@ -58,8 +62,9 @@ func main() {
 					return
 				}
 
-				// Sync only touches courses and assignments; keep tasks edited since it started
+				// Sync only touches courses and assignments; keep tasks and notes edited since it started
 				updated.Tasks = data.Tasks
+				updated.Notes = data.Notes
 				*data = updated
 
 				if err := store.SaveAppData(*data); err != nil {
