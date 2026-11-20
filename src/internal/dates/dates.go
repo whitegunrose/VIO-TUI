@@ -69,12 +69,10 @@ func Parse(text string, now time.Time) (time.Time, error) {
 
 	// Relative offsets keep the current clock time: "+2h", "+3d", "in 2 weeks"
 	if m := offsetRe.FindStringSubmatch(s); m != nil {
-		n, _ := strconv.Atoi(m[1])
-		return addOffset(now, n, m[2]), nil
+		return offsetFrom(now, m[1], m[2])
 	}
 	if m := inRe.FindStringSubmatch(s); m != nil {
-		n, _ := strconv.Atoi(m[1])
-		return addOffset(now, n, m[2][:1]), nil
+		return offsetFrom(now, m[1], m[2][:1])
 	}
 
 	// Split into a day part and an optional trailing time part
@@ -86,7 +84,7 @@ func Parse(text string, now time.Time) (time.Time, error) {
 			return time.Time{}, fmt.Errorf("can't read %q; try %s", text, Hint)
 		}
 		day = midnight(now)
-		if day.Add(time.Duration(clock) * time.Minute).Before(now) {
+		if atClock(day, clock).Before(now) {
 			day = day.AddDate(0, 0, 1)
 		}
 	} else {
@@ -100,7 +98,34 @@ func Parse(text string, now time.Time) (time.Time, error) {
 	if !hasClock {
 		clock = endOfDay
 	}
-	return day.Add(time.Duration(clock) * time.Minute), nil
+	return atClock(day, clock), nil
+}
+
+// atClock returns day's date at the given minutes after midnight, as a
+// wall-clock time. Adding minutes to midnight instead would be an hour off
+// on daylight-saving change days, which are 23 or 25 hours long.
+func atClock(day time.Time, minutes int) time.Time {
+	y, m, d := day.Date()
+	return time.Date(y, m, d, minutes/60, minutes%60, 0, 0, day.Location())
+}
+
+// maxOffsetDays caps "+Nd"-style offsets at about ten years. Without a cap,
+// a huge hour count overflows time.Duration and gives a nonsense date.
+const maxOffsetDays = 3660
+
+func offsetFrom(now time.Time, digits, unit string) (time.Time, error) {
+	n, err := strconv.Atoi(digits)
+	days := n
+	switch unit {
+	case "h":
+		days = n / 24
+	case "w":
+		days = n * 7
+	}
+	if err != nil || n > maxOffsetDays*24 || days > maxOffsetDays {
+		return time.Time{}, fmt.Errorf("%s%s is too far ahead; use a date instead", digits, unit)
+	}
+	return addOffset(now, n, unit), nil
 }
 
 func addOffset(now time.Time, n int, unit string) time.Time {
@@ -296,16 +321,16 @@ func validDate(y int, m time.Month, d int, loc *time.Location) (time.Time, error
 	return t, nil
 }
 
+// nextOccurrence returns the next m/d on or after today. Feb 29 can be up
+// to 8 years away (leap years skip 2100, 2200, 2300), so it looks that far.
 func nextOccurrence(today time.Time, m time.Month, d int) (time.Time, error) {
-	t, err := validDate(today.Year(), m, d, today.Location())
-	if err != nil {
-		// Feb 29 in a non-leap year: try next year
-		return validDate(today.Year()+1, m, d, today.Location())
+	for y := today.Year(); y <= today.Year()+8; y++ {
+		t, err := validDate(y, m, d, today.Location())
+		if err == nil && !t.Before(today) {
+			return t, nil
+		}
 	}
-	if t.Before(today) {
-		return validDate(today.Year()+1, m, d, today.Location())
-	}
-	return t, nil
+	return time.Time{}, fmt.Errorf("no such date")
 }
 
 // Describe renders t for a "reads as" preview: "Fri Nov 20, 5:00 PM (in 2 days)".

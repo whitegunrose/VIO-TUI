@@ -2,9 +2,6 @@ package dates
 
 import (
 	"fmt"
-	"math"
-	"strconv"
-	"strings"
 	"testing"
 	"time"
 )
@@ -26,7 +23,7 @@ func FuzzParse(f *testing.F) {
 		"+3d", "+2h", "in 2 days", "9am", "17:00", "11/20", "11/20/26 3pm",
 		"nov 20", "December 3rd 2pm", "dec 3 2027", "", "5", "someday",
 		"2026-02-30", "13/40", "fri 25pm", "next blursday", "at", "  at  5pm ",
-		"in 0 days", "+999999999999h", "2/29",
+		"in 0 days", "+999999999999h", "2/29", "3/14 5pm",
 	} {
 		f.Add(s)
 	}
@@ -34,9 +31,6 @@ func FuzzParse(f *testing.F) {
 		got, err := Parse(s, now)
 		if err != nil {
 			return
-		}
-		if offsetOverflows(s) {
-			t.Skip("known bug: huge offsets like +999999999999h overflow (testing_strategy.md, law D2)")
 		}
 		if got.Location() != now.Location() {
 			t.Errorf("Parse(%q) location = %v, want %v", s, got.Location(), now.Location())
@@ -69,58 +63,32 @@ func FuzzLayoutRoundTrip(f *testing.F) {
 
 // Law D4: any month/day that exists in some year ("2/29", "12/31") can be
 // typed without a year, and reads as the next time that date comes around.
+// Law D5: a typed time lands at that clock time on that day, including on
+// daylight-saving change days (run with a DST time zone to cover them).
 func FuzzMonthDay(f *testing.F) {
 	f.Add(11, 20)
 	f.Add(1, 5)
 	f.Add(12, 31)
 	f.Add(2, 28)
-	f.Add(2, 29) // found: no year ahead has Feb 29 within one year
-	f.Add(3, 14) // found by fuzzing: Mar 14 2027 is a daylight-saving change day
+	f.Add(2, 29) // regression: no Feb 29 within one year
+	f.Add(3, 14) // regression, found by fuzzing: Mar 14 2027 is a daylight-saving change day
+	f.Add(11, 7) // regression: Nov 7 2027 is the other change day
 	f.Fuzz(func(t *testing.T, mo, d int) {
 		month := time.Month(1 + abs(mo)%12)
 		// 2028 is a leap year, so this is the longest each month can be
 		day := 1 + abs(d)%daysIn(2028, month)
-		if month == time.February && day == 29 {
-			t.Skip("known bug: nextOccurrence only looks one year ahead (testing_strategy.md, law D4)")
-		}
-		text := fmt.Sprintf("%d/%d", month, day)
+		text := fmt.Sprintf("%d/%d 5pm", month, day)
 		got, err := Parse(text, now)
-		if isDSTChangeDay(time.Date(now.Year(), month, day, 0, 0, 0, 0, time.Local)) ||
-			isDSTChangeDay(time.Date(now.Year()+1, month, day, 0, 0, 0, 0, time.Local)) {
-			t.Skip("known bug: times on daylight-saving change days are an hour off (testing_strategy.md, law D5)")
-		}
 		if err != nil {
 			t.Fatalf("Parse(%q) error: %v", text, err)
 		}
-		if got.Month() != month || got.Day() != day {
+		if got.Month() != month || got.Day() != day || got.Hour() != 17 || got.Minute() != 0 {
 			t.Errorf("Parse(%q) = %s, wrong month or day", text, got.Format(Layout))
 		}
 		if got.Before(midnight(now)) || got.After(midnight(now).AddDate(4, 0, 1)) {
 			t.Errorf("Parse(%q) = %s, not the next one to come", text, got.Format(Layout))
 		}
 	})
-}
-
-// offsetOverflows reports whether s is an hour offset too big for
-// time.Duration, which Parse doesn't check yet.
-func offsetOverflows(s string) bool {
-	s = strings.Join(strings.Fields(strings.ToLower(s)), " ")
-	var digits, unit string
-	if m := offsetRe.FindStringSubmatch(s); m != nil {
-		digits, unit = m[1], m[2]
-	} else if m := inRe.FindStringSubmatch(s); m != nil {
-		digits, unit = m[1], m[2][:1]
-	} else {
-		return false
-	}
-	n, err := strconv.ParseInt(digits, 10, 64)
-	return err != nil || (unit == "h" && n > int64(math.MaxInt64/time.Hour))
-}
-
-// isDSTChangeDay reports whether t's local day is not 24 hours long.
-func isDSTChangeDay(t time.Time) bool {
-	start := midnight(t)
-	return start.AddDate(0, 0, 1).Sub(start) != 24*time.Hour
 }
 
 func abs(n int) int {
