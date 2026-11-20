@@ -17,6 +17,7 @@ go build -o ../vio .  # build binary (/vio is gitignored)
 go vet ./...
 go test ./...         # tests: internal/model, internal/dates, internal/canvas, internal/store, internal/widgets
 go test ./internal/model -run TestParseMeeting   # single test
+go test -run '^$' -fuzz FuzzParse -fuzztime 30s ./internal/dates   # fuzz one target (see fuzz_test.go in each package)
 ```
 
 ## Architecture
