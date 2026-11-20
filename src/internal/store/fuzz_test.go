@@ -27,11 +27,14 @@ func fuzzSeeds(f *testing.F) {
 		`{"courses": [{"id": "c", "meeting_times": ["Mon 12:34 PM", "whenever"]}]}`,
 		`{"notes": [{"id": ""}, {"id": ""}, {"title": "x", "course_id": "nope"}]}`,
 		`{"assignments": [{"id": "x", "course_id": ""}, {"id": "x"}]}`,
+		`{"courses": [{"id": "c"}], "assignments": [{"id": "r", "course_id": "c", "name": "Reading", "due_at": null}], "tasks": []}`,
 		`{"courses": [{"id": "comp123-2"}, {"id": "comp123"}, {"id": "comp123"}]}`,
 		`{"student": {"name": "x"`,
 		``,
-		// found by fuzzing: an assignment's fallback course doesn't exist
+		// regression, found by fuzzing: an assignment's fallback course didn't exist
 		`{"Courses":[{}],"Assignments":[{},{}],"tAsks":[]}`,
+		// regression, found by fuzzing: an already-overdue task reported a change on every pass
+		`{"tasks": [{"id": "t", "title": "late", "status": "overdue", "due_at": "2020-01-01T00:00:00Z"}]}`,
 	} {
 		f.Add([]byte(s))
 	}
@@ -39,6 +42,8 @@ func fuzzSeeds(f *testing.F) {
 
 // Law S1: normalizing is idempotent. Cleaning already-clean data changes
 // nothing and reports no change, so a clean file is never rewritten on load.
+// Law S4: an assignment with no due date stays undated, and one with a due
+// date keeps it.
 // Law S2: after normalizing, IDs are unique within courses, assignments,
 // tasks and notes, and every course reference points at a real course.
 func FuzzNormalize(f *testing.F) {
@@ -48,12 +53,13 @@ func FuzzNormalize(f *testing.F) {
 		if json.Unmarshal(raw, &in) != nil {
 			return
 		}
-		if seedsSampleData(in) {
-			t.Skip("known bug: sample data is added after the checks (testing_strategy.md, law S1)")
-		}
 		once, _ := normalizeAppData(in)
-		if hasDanglingAssignment(once) {
-			t.Skip("known bug: an assignment's fallback course may not exist (testing_strategy.md, law S2)")
+		if len(in.Assignments) == len(once.Assignments) {
+			for i := range in.Assignments {
+				if (in.Assignments[i].DueAt == nil) != (once.Assignments[i].DueAt == nil) {
+					t.Fatalf("assignment %d: due date presence changed (undated assignments must stay undated)", i)
+				}
+			}
 		}
 		twice, changed := normalizeAppData(once)
 		if changed || !reflect.DeepEqual(once, twice) {
@@ -111,15 +117,7 @@ func FuzzLoad(f *testing.F) {
 			t.Fatal(err)
 		}
 
-		var in model.AppData
-		if json.Unmarshal(raw, &in) == nil && seedsSampleData(in) {
-			t.Skip("known bug: sample data is added after the checks (testing_strategy.md, law S1)")
-		}
-
 		data, err := loadAppDataFrom(path)
-		if err == nil && hasDanglingAssignment(*data) {
-			t.Skip("known bug: an assignment's fallback course may not exist (testing_strategy.md, law S2)")
-		}
 		if err != nil {
 			var corrupt *CorruptDataError
 			if !errors.As(err, &corrupt) {
@@ -145,27 +143,4 @@ func FuzzLoad(f *testing.F) {
 			t.Fatalf("save + load changed the data\nfirst:  %s\nsecond: %s", a, b)
 		}
 	})
-}
-
-// seedsSampleData reports whether normalizeAppData will fill in sample
-// courses, assignments or tasks, which it currently does without checking
-// them against the rest of the data.
-func seedsSampleData(d model.AppData) bool {
-	return len(d.Courses) == 0 || len(d.Assignments) == 0 || d.Tasks == nil
-}
-
-// hasDanglingAssignment reports whether an assignment points at a course
-// that isn't in the list, which normalizeAppData can produce when its
-// fallback (a sample course ID) doesn't exist either.
-func hasDanglingAssignment(d model.AppData) bool {
-	valid := map[string]bool{}
-	for _, c := range d.Courses {
-		valid[c.ID] = true
-	}
-	for _, a := range d.Assignments {
-		if !valid[a.CourseID] {
-			return true
-		}
-	}
-	return false
 }

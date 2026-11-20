@@ -116,10 +116,14 @@ func TestNormalizeMigratesLegacyMeetingTimes(t *testing.T) {
 		t.Fatalf("MeetingTimes = %v, want [whenever]", c.MeetingTimes)
 	}
 
-	// A second pass must not migrate the same meeting again
-	again, _ := normalizeAppData(out)
+	// A second pass must not migrate the same meeting again, nor report a
+	// change for the unreadable string it keeps (regression, FuzzNormalize)
+	again, changed2 := normalizeAppData(out)
 	if len(again.Courses[0].Meetings) != 1 {
 		t.Fatalf("second pass duplicated meetings: %+v", again.Courses[0].Meetings)
+	}
+	if changed2 {
+		t.Fatal("second pass reported a change for an unreadable legacy string")
 	}
 }
 
@@ -138,7 +142,7 @@ func TestNormalizeAssignments(t *testing.T) {
 		t.Fatal("duplicate assignment IDs kept")
 	}
 	for _, a := range out.Assignments {
-		if a.Name == "" || a.DueAt == nil {
+		if a.Name == "" {
 			t.Fatalf("assignment not filled in: %+v", a)
 		}
 		if !valid[a.CourseID] {
@@ -257,5 +261,82 @@ func TestNormalizeNotes(t *testing.T) {
 	out, _ = normalizeAppData(in)
 	if out.Notes != nil {
 		t.Fatalf("notes were seeded: %+v", out.Notes)
+	}
+}
+
+// Regression, found by FuzzNormalize: sample data used to be added after the
+// checks, so it came out uncleaned (status "todo", no start time, links to
+// courses that don't exist in the file).
+func TestNormalizeCleansSampleData(t *testing.T) {
+	in := model.AppData{Courses: []model.Course{{ID: "mine", Name: "Mine", Code: "MINE 1"}}}
+	out, _ := normalizeAppData(in)
+	if len(out.Tasks) == 0 || len(out.Assignments) == 0 {
+		t.Fatalf("sample tasks/assignments not added: %+v", out)
+	}
+	for _, task := range out.Tasks {
+		if task.Status != "in_progress" && task.Status != "overdue" {
+			t.Errorf("sample task %q status %q, want normalized", task.ID, task.Status)
+		}
+		if task.StartsAt == nil {
+			t.Errorf("sample task %q has no start time", task.ID)
+		}
+		if task.CourseID != "" && task.CourseID != "mine" {
+			t.Errorf("sample task %q links to missing course %q", task.ID, task.CourseID)
+		}
+	}
+	for _, a := range out.Assignments {
+		if a.CourseID != "mine" {
+			t.Errorf("sample assignment %q links to %q, want the only real course", a.ID, a.CourseID)
+		}
+	}
+	if _, changed := normalizeAppData(out); changed {
+		t.Error("normalizing the result again reported a change")
+	}
+}
+
+// Regression, found by FuzzNormalize: an assignment whose course is missing
+// was pointed at a sample course ID that didn't exist either.
+func TestNormalizeFallbackCourseExists(t *testing.T) {
+	in := validData()
+	in.Courses = []model.Course{{ID: "only", Name: "Only", Code: "ONLY 1"}}
+	in.Assignments = []model.Assignment{
+		{ID: "a1", CourseID: "dropped", Name: "Old", DueAt: ptr(futureDue)},
+		{ID: "a2", CourseID: "", Name: "No course", DueAt: ptr(futureDue)},
+	}
+	in.Tasks = []model.Task{}
+	out, _ := normalizeAppData(in)
+	for _, a := range out.Assignments {
+		if a.CourseID != "only" {
+			t.Errorf("assignment %q links to %q, want the real course", a.ID, a.CourseID)
+		}
+	}
+}
+
+// Regression, found by FuzzNormalize: an already-overdue task was reported
+// as changed on every pass, so data.json was rewritten on every launch.
+func TestNormalizeOverdueTaskIsStable(t *testing.T) {
+	past := futureDue.AddDate(-1, 0, 0)
+	in := validData()
+	in.Tasks = []model.Task{{ID: "t", Title: "late", Status: "in_progress", StartsAt: &past, DueAt: &past}}
+	once, changed := normalizeAppData(in)
+	if !changed || once.Tasks[0].Status != "overdue" {
+		t.Fatalf("first pass: changed=%v status=%q, want true and overdue", changed, once.Tasks[0].Status)
+	}
+	if _, changed := normalizeAppData(once); changed {
+		t.Fatal("second pass reported a change for a task that is already overdue")
+	}
+}
+
+// Canvas assignments can have no due date until a professor sets one, so
+// normalizing must keep them undated (it used to copy in a sample date).
+func TestNormalizeKeepsUndatedAssignment(t *testing.T) {
+	in := validData()
+	in.Assignments = []model.Assignment{{ID: "a1", CourseID: "c1", Name: "Reading", CanvasID: 42}}
+	out, changed := normalizeAppData(in)
+	if out.Assignments[0].DueAt != nil {
+		t.Fatalf("undated assignment got a due date: %v", out.Assignments[0].DueAt)
+	}
+	if changed {
+		t.Error("an undated assignment was reported as a change")
 	}
 }

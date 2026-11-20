@@ -292,6 +292,22 @@ func normalizeAppData(data model.AppData) (model.AppData, bool) {
 		changed = true
 	}
 
+	// Sample data is added first, so it goes through the same checks as
+	// everything else below. Tasks are only seeded when the list is missing,
+	// so deleting every task sticks; notes are never seeded.
+	if len(data.Courses) == 0 {
+		data.Courses = defaults.Courses
+		changed = true
+	}
+	if len(data.Assignments) == 0 {
+		data.Assignments = defaults.Assignments
+		changed = true
+	}
+	if data.Tasks == nil {
+		data.Tasks = defaults.Tasks
+		changed = true
+	}
+
 	courseSeen := make(map[string]bool)
 	normalizedCourses := make([]model.Course, 0, len(data.Courses))
 	for i, course := range data.Courses {
@@ -323,15 +339,15 @@ func normalizeAppData(data model.AppData) (model.AppData, bool) {
 					unread = append(unread, legacy)
 				}
 			}
+			// Report a change only if something migrated; otherwise an
+			// unreadable string would rewrite data.json on every launch
+			if len(unread) != len(course.MeetingTimes) {
+				changed = true
+			}
 			course.MeetingTimes = unread
-			changed = true
 		}
 		courseSeen[course.ID] = true
 		normalizedCourses = append(normalizedCourses, course)
-	}
-	if len(normalizedCourses) == 0 {
-		normalizedCourses = defaults.Courses
-		changed = true
 	}
 	data.Courses = normalizedCourses
 
@@ -349,27 +365,25 @@ func normalizeAppData(data model.AppData) (model.AppData, bool) {
 			changed = true
 		}
 		if strings.TrimSpace(assignment.CourseID) == "" || !courseValid[assignment.CourseID] {
+			// The sample course may not exist in this file; fall back to a real one
 			assignment.CourseID = def.CourseID
+			if !courseValid[assignment.CourseID] {
+				assignment.CourseID = data.Courses[0].ID
+			}
 			changed = true
 		}
 		if strings.TrimSpace(assignment.Name) == "" {
 			assignment.Name = def.Name
 			changed = true
 		}
-		if assignment.DueAt == nil {
-			assignment.DueAt = def.DueAt
-			changed = true
-		}
+		// A missing due date is kept: Canvas assignments can be undated until
+		// a professor sets one, and the next sync picks it up
 		if assignSeen[assignment.ID] {
 			assignment.ID = fmt.Sprintf("%s-%d", def.ID, i+1)
 			changed = true
 		}
 		assignSeen[assignment.ID] = true
 		normalizedAssignments = append(normalizedAssignments, assignment)
-	}
-	if len(normalizedAssignments) == 0 {
-		normalizedAssignments = defaults.Assignments
-		changed = true
 	}
 	data.Assignments = normalizedAssignments
 
@@ -409,16 +423,11 @@ func normalizeAppData(data model.AppData) (model.AppData, bool) {
 			task.Status = status
 			changed = true
 		}
-		if task.Status != "complete" && task.DueAt != nil && task.DueAt.Before(now) {
+		if task.Status == "in_progress" && task.DueAt != nil && task.DueAt.Before(now) {
 			task.Status = "overdue"
 			changed = true
 		}
 		normalizedTasks = append(normalizedTasks, task)
-	}
-	// Only seed sample tasks when the list is missing, so deleting every task sticks
-	if data.Tasks == nil {
-		normalizedTasks = defaults.Tasks
-		changed = true
 	}
 	data.Tasks = normalizedTasks
 

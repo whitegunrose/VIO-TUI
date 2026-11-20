@@ -293,7 +293,7 @@ func fillAssignments(list *tview.List, data *model.AppData, showDone bool) []str
 			done = append(done, i)
 		case a.NeedsAttention(now):
 			attention = append(attention, i)
-		case a.DueAt != nil:
+		default: // includes undated assignments, which byDue sorts last
 			upcoming = append(upcoming, i)
 		}
 	}
@@ -377,6 +377,8 @@ func assignmentRow(data *model.AppData, a model.Assignment, now time.Time) (stri
 	if a.DueAt != nil {
 		due := a.DueAt.In(time.Local)
 		parts = append(parts, "due "+due.Format("Mon Jan 2, 3:04 PM")+" ("+dates.Relative(due, now)+")")
+	} else {
+		parts = append(parts, "no due date yet")
 	}
 	if a.PointsPossible > 0 {
 		parts = append(parts, fmt.Sprintf("%.0f pts", a.PointsPossible))
