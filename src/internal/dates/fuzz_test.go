@@ -44,10 +44,11 @@ func FuzzParse(f *testing.F) {
 // Law D3: what VIO displays in a form reads back unchanged.
 // Formatting any minute with Layout and parsing it gives the same moment.
 func FuzzLayoutRoundTrip(f *testing.F) {
-	f.Add(2026, 11, 20, 17, 0)
-	f.Add(2028, 2, 29, 23, 59)
-	f.Add(2026, 3, 8, 2, 30)  // inside the spring-forward gap in US zones
-	f.Add(2026, 11, 1, 1, 30) // the repeated hour in US zones
+	// Inputs map to year 1970 + y%200, month 1 + mo%12, day 1 + d%31
+	f.Add(56, 10, 19, 17, 0) // 2026-11-20 17:00
+	f.Add(58, 1, 28, 23, 59) // 2028-02-29 23:59
+	f.Add(56, 2, 7, 2, 30)   // 2026-03-08 02:30, inside the spring-forward gap in US zones
+	f.Add(56, 10, 0, 1, 30)  // 2026-11-01 01:30, the repeated hour in US zones
 	f.Fuzz(func(t *testing.T, y, mo, d, h, mi int) {
 		want := time.Date(1970+abs(y)%200, time.Month(1+abs(mo)%12), 1+abs(d)%31, abs(h)%24, abs(mi)%60, 0, 0, time.Local)
 		text := want.Format(Layout)
@@ -66,13 +67,15 @@ func FuzzLayoutRoundTrip(f *testing.F) {
 // Law D5: a typed time lands at that clock time on that day, including on
 // daylight-saving change days (run with a DST time zone to cover them).
 func FuzzMonthDay(f *testing.F) {
-	f.Add(11, 20)
-	f.Add(1, 5)
-	f.Add(12, 31)
-	f.Add(2, 28)
-	f.Add(2, 29) // regression: no Feb 29 within one year
-	f.Add(3, 14) // regression, found by fuzzing: Mar 14 2027 is a daylight-saving change day
-	f.Add(11, 7) // regression: Nov 7 2027 is the other change day
+	// The fuzz inputs map to a date as month = 1 + mo%12, day = 1 + d%days,
+	// so seed (m-1, d-1) means m/d
+	f.Add(10, 19) // 11/20
+	f.Add(0, 4)   // 1/5
+	f.Add(11, 30) // 12/31
+	f.Add(1, 27)  // 2/28
+	f.Add(1, 28)  // 2/29 (regression: no Feb 29 within one year)
+	f.Add(2, 13)  // 3/14 (regression, found by fuzzing: Mar 14 2027 is a DST change day)
+	f.Add(10, 6)  // 11/7 (regression: Nov 7 2027 is the other DST change day)
 	f.Fuzz(func(t *testing.T, mo, d int) {
 		month := time.Month(1 + abs(mo)%12)
 		// 2028 is a leap year, so this is the longest each month can be
