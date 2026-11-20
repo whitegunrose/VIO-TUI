@@ -17,11 +17,8 @@ func main() {
 	// Must run before any widget is built
 	theme.ApplyTheme()
 
-	// Load local JSON data
-	data, err := store.LoadAppData()
-	if err != nil {
-		panic(err)
-	}
+	// Load local JSON data (offers to restore data.json.bak if it's unreadable)
+	data := loadOrRecover()
 
 	canvasCfg, cfgExists, err := store.LoadCanvasConfig()
 	if err != nil {
@@ -194,8 +191,8 @@ func main() {
 		startPolling()
 	}
 
-	// Start program
-	if err := app.SetRoot(flex, true).SetFocus(flex).Run(); err != nil {
+	// Start program (the root was set above: the Canvas prompt on first run, else the dashboard)
+	if err := app.Run(); err != nil {
 		panic(err)
 	}
 }
