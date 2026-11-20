@@ -15,7 +15,7 @@ cd src
 go run .              # run the TUI
 go build -o ../vio .  # build binary (/vio is gitignored)
 go vet ./...
-go test ./...         # tests: internal/model, internal/dates, internal/canvas, internal/widgets
+go test ./...         # tests: internal/model, internal/dates, internal/canvas, internal/store, internal/widgets
 go test ./internal/model -run TestParseMeeting   # single test
 ```
 
@@ -25,6 +25,7 @@ go test ./internal/model -run TestParseMeeting   # single test
 - **`internal/model`** — `AppData` (Student, Courses, Assignments, Tasks, Notes) is the single in-memory source of truth, passed as `*model.AppData` to every view.
 - **`internal/store`** — persistence under `os.UserConfigDir()/vio/`:
   - `data.json` (`store.go`): created with sample starter data on first run. Both load and save pass through `normalizeAppData`, which fills missing fields from defaults, dedupes IDs, drops invalid course refs, normalizes task status to `complete` / `overdue` / `in_progress`, and marks past-due tasks `overdue`. It also migrates legacy `Course.MeetingTimes` strings ("Mon 12:34 PM") into structured `Course.Meetings`. Changes to the model usually need matching changes here.
+  - Saves are crash-safe (`atomic.go`): `writeFileAtomic` writes a hidden temp file in the same folder, fsyncs it, renames it over the target and fsyncs the folder. Each `data.json` save first copies the version it replaces to `data.json.bak` (only if that version is valid JSON and differs). If `data.json` can't be decoded, `LoadAppData` returns `*store.CorruptDataError`; `main.go`'s `loadOrRecover` (`recover.go`) shows a modal offering `store.RestoreBackup`, which moves the bad file aside as `data.json.corrupt-<time>` and restores the backup. Always write app files through `writeFileAtomic`, never `os.WriteFile`.
   - `config.json` (`config.go`): Canvas domain, poll minutes, and the API token encrypted with AES-GCM using a key derived from username + hostname (so the config isn't portable between machines).
 - **`internal/canvas`** — Canvas REST client with `Link`-header pagination. `SyncCoursesAndAssignments` merges courses (preserving user-entered fields: location, meetings, notes; `main.go` reapplies them via `canvas.MergeCourses` for edits made mid-sync) but **replaces** the assignment list wholesale.
 - **`internal/widgets`** — the dashboard and its routing:

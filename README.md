@@ -133,6 +133,7 @@ On first launch VIO creates a `vio/` folder in your OS config directory:
 | Windows | `%AppData%\vio\`                       |
 
 - **`data.json`** — your student info, courses, assignments, and tasks. It's seeded with sample data on first run so the dashboard isn't empty; edit or replace it with your own.
+- **`data.json.bak`** — the previous version of `data.json`. Saves are crash-safe, but if `data.json` ever can't be read, VIO offers to restore this backup on launch (the unreadable file is kept as `data.json.corrupt-<date>`).
 - **`config.json`** — Canvas settings. Your API token is encrypted with a key tied to your username and hostname, so this file won't work if copied to another machine — just re-enter your token there.
 
 <p align="right">(<a href="#readme-top">back to top</a>)</p>
@@ -244,6 +245,7 @@ Contributions are welcome! If you have an idea that would make VIO better, open 
    cd src
    gofmt -l .     # should print nothing
    go vet ./...
+   go test ./...
    go build ./...
    go run .       # try it out in your terminal
    ```

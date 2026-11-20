@@ -110,7 +110,7 @@ func SaveCanvasConfig(cfg CanvasConfig) error {
 		return fmt.Errorf("encode config file: %w", err)
 	}
 
-	if err := os.WriteFile(path, bytes, 0o600); err != nil {
+	if err := writeFileAtomic(path, bytes, 0o600); err != nil {
 		return fmt.Errorf("write config file: %w", err)
 	}
 
