@@ -1,0 +1,60 @@
+name: Fuzz
+
+# Fuzzing searches for new failing inputs, so it runs on a schedule and on
+# demand rather than on every push. The seed inputs already run in CI as
+# part of `go test ./...`.
+on:
+  schedule:
+    - cron: "17 9 * * 1" # Mondays, 09:17 UTC
+  workflow_dispatch:
+    inputs:
+      fuzztime:
+        description: "Time per fuzz target (e.g. 60s, 5m)"
+        default: "60s"
+
+permissions:
+  contents: read
+
+jobs:
+  fuzz:
+    name: ${{ matrix.target }}
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        target:
+          - dates FuzzParse
+          - dates FuzzLayoutRoundTrip
+          - dates FuzzMonthDay
+          - model FuzzParseMeeting
+          - model FuzzMeetingConflicts
+          - model FuzzAgendaOrder
+          - store FuzzNormalize
+          - store FuzzLoad
+          - canvas FuzzNextLink
+          - canvas FuzzMergeCourses
+    defaults:
+      run:
+        working-directory: src
+    env:
+      TZ: America/Los_Angeles # a zone with daylight saving, so DST bugs can show up
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-go@v5
+        with:
+          go-version-file: src/go.mod
+          cache-dependency-path: src/go.sum
+
+      - name: Fuzz
+        run: |
+          set -- ${{ matrix.target }}
+          go test -run '^$' -fuzz "^$2\$" -fuzztime "${{ inputs.fuzztime || '60s' }}" "./internal/$1"
+
+      - name: Keep the failing input
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: failing-input-${{ strategy.job-index }}
+          path: src/internal/*/testdata/fuzz/
