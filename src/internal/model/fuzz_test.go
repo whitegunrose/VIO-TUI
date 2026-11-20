@@ -21,7 +21,7 @@ func FuzzParseMeeting(f *testing.F) {
 		"MWF 9am to 9:50am", "Thursday 13:00-14:15", "Tue 11:30 - 1", "mon, wed 1-2",
 		"F 9 to 8", "Xyz 1-2", "", "@", "M 1-2 @ ", "Mon 12-12:01am", "TR 0:00-23:59",
 		"Mon Wed 9am to 10:15am @ JD 1600 - Lab", "su sa 7 - 8 @ Gym @ North",
-		"T 1-17", // found by fuzzing: end became 29:00
+		"T 1-17", // regression, found by fuzzing: end became 29:00
 	} {
 		f.Add(s)
 	}
@@ -29,9 +29,6 @@ func FuzzParseMeeting(f *testing.F) {
 		m, err := ParseMeeting(s)
 		if err != nil {
 			return
-		}
-		if mixesClockStyles(s) {
-			t.Skip("known bug: a guessed 12-hour start with a 24-hour end, like \"1-17\" (testing_strategy.md, law M2)")
 		}
 		if len(m.Days) == 0 {
 			t.Fatalf("ParseMeeting(%q) has no days", s)
@@ -106,21 +103,6 @@ func FuzzAgendaOrder(f *testing.F) {
 			}
 		}
 	})
-}
-
-// mixesClockStyles reports whether neither time has AM/PM and only one of
-// them is a 24-hour time (13 to 23), a case ParseMeeting mishandles.
-func mixesClockStyles(s string) bool {
-	parts := meetingRe.FindStringSubmatch(s)
-	if parts == nil {
-		return false
-	}
-	sh, _, sap, err1 := parseClock(parts[2])
-	eh, _, eap, err2 := parseClock(parts[3])
-	if err1 != nil || err2 != nil || sap != 0 || eap != 0 {
-		return false
-	}
-	return (guessHalf(sh) == 0) != (guessHalf(eh) == 0)
 }
 
 func dayIndex(d string) int {

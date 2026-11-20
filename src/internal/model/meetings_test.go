@@ -18,6 +18,9 @@ func TestParseMeeting(t *testing.T) {
 		{"mwf 9-9:50", Meeting{Days: []string{"Mon", "Wed", "Fri"}, Start: "09:00", End: "09:50"}},
 		{"TR 13:00 - 14:15 @ Sierra Hall 101", Meeting{Days: []string{"Tue", "Thu"}, Start: "13:00", End: "14:15", Location: "Sierra Hall 101"}},
 		{"Mon, Wed 10am – 11:15am", Meeting{Days: []string{"Mon", "Wed"}, Start: "10:00", End: "11:15"}},
+		// A 24-hour end makes both ends 24-hour (regression: was 13:00 to 29:00)
+		{"T 1-17", Meeting{Days: []string{"Tue"}, Start: "01:00", End: "17:00"}},
+		{"MW 12-17", Meeting{Days: []string{"Mon", "Wed"}, Start: "12:00", End: "17:00"}},
 	}
 	for _, tt := range tests {
 		got, err := ParseMeeting(tt.in)

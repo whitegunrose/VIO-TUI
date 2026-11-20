@@ -61,8 +61,8 @@ func (d *AppData) Agenda(day time.Time, includeDone bool) []AgendaItem {
 			items = append(items, AgendaItem{
 				Kind: ItemClass, Index: ci, CourseIndex: ci,
 				Title:    ShortCode(c.Code, c.Name),
-				At:       midnight.Add(time.Duration(s) * time.Minute),
-				End:      midnight.Add(time.Duration(e) * time.Minute),
+				At:       atClock(midnight, s),
+				End:      atClock(midnight, e),
 				Location: loc,
 			})
 		}
@@ -93,6 +93,13 @@ func (d *AppData) Agenda(day time.Time, includeDone bool) []AgendaItem {
 
 	sort.SliceStable(items, func(i, j int) bool { return items[i].At.Before(items[j].At) })
 	return items
+}
+
+// atClock returns day's date at minutes after midnight, as a wall-clock
+// time, so a 10:00 class is at 10:00 even on a daylight-saving change day.
+func atClock(day time.Time, minutes int) time.Time {
+	y, m, d := day.Date()
+	return time.Date(y, m, d, minutes/60, minutes%60, 0, 0, day.Location())
 }
 
 // SameLocalDay reports whether a and b fall on the same local calendar day.

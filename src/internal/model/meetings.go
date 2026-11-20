@@ -139,10 +139,17 @@ func ParseMeeting(line string) (Meeting, error) {
 	}
 
 	if sap == 0 && eap == 0 {
-		sap, eap = guessHalf(sh), guessHalf(eh)
+		// Guess AM/PM only when both ends read as 12-hour times. If either
+		// is already 24-hour (0 or 13–23), read both as 24-hour: "1-17" is
+		// 01:00–17:00, not 1 PM to 29:00.
+		if gs, ge := guessHalf(sh), guessHalf(eh); gs != 0 && ge != 0 {
+			sap, eap = gs, ge
+		}
 	}
 	var start, end int
 	switch {
+	case sap == 0 && eap == 0: // both 24-hour
+		start, end = toMinutes(sh, sm, 0), toMinutes(eh, em, 0)
 	case sap == 0: // only the end says AM/PM
 		end = toMinutes(eh, em, eap)
 		start = toMinutes(sh, sm, eap)
