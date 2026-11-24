@@ -1,49 +1,110 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Standing rules and current decisions for Claude Code in VIO-TUI. Keep this file short. Longer material lives in the committed `docs/` files linked below. If something here conflicts with a handoff spec, stop and ask.
 
 ## Project
 
-VIO-TUI is a keyboard-driven terminal app (Go + [tview](https://github.com/rivo/tview)/tcell) for students to track courses, assignments, tasks, and schedule, with optional Canvas LMS sync.
+VIO-TUI is a keyboard-driven terminal app (Go + [tview](https://github.com/rivo/tview)/tcell) for students: dashboard panes (Calendar, Courses, Tasks, Today, Notes), a calendar week view with class meeting times, tasks, assignments, and optional Canvas LMS sync.
+
+## Hard rules (never break these)
+
+1. **Never commit or push.** Do not run `git commit`, `git push`, `git merge`, `git rebase`, `git reset --hard`, `git tag`, or anything else that writes history or touches the remote. Edit files, then end with a **Git commands** block for me to run myself (see format below). Read-only git (`status`, `diff`, `log`, `branch --show-current`) is fine.
+2. **No Claude attribution, anywhere.** No `Co-Authored-By` trailers, no "Generated with Claude Code" lines, no Claude mentions in commit messages, PR text, code comments, or docs. Commit messages you suggest are plain, as if I wrote them.
+3. **Features are user stories, `US-xx`,** numbered as in the VIO Feature Roadmap. Use the number in branch names, suggested commit messages and test names where it helps. Never invent a new US number: if work doesn't fit an existing story, say so and I'll assign one in Chat.
+4. **Only build what the handoff spec says.** If the spec is unclear, or the code makes a rule in it impossible, stop and ask rather than guess. Note follow-up ideas at the end instead of building them.
+5. **Anything you must follow lives in this file or a committed `docs/` file.** `aidlc-docs/` and `.kiro/` are gitignored local material: you may read them for background, but they are never the source of a rule, and committed code must not point readers to them.
 
 ## Commands
 
-The Go module (`module VIO`, Go 1.24) lives in `src/`, not the repo root — run all Go commands from there.
+The Go module (`module VIO`, Go 1.24.5) lives in `src/`, not the repo root. Run all Go commands from there.
 
 ```sh
 cd src
 go run .              # run the TUI
 go build -o ../vio .  # build binary (/vio is gitignored)
+gofmt -l .            # must print nothing (CI fails otherwise)
 go vet ./...
-go test ./...         # tests: internal/model, internal/dates, internal/canvas, internal/store, internal/widgets
-go test ./internal/model -run TestParseMeeting   # single test
-go test -run '^$' -fuzz FuzzParse -fuzztime 30s ./internal/dates   # fuzz one target (see fuzz_test.go in each package)
+go test ./...         # unit tests + every fuzz target's seed corpus
+go test -race ./...   # CI runs this on Linux
+go test ./internal/model -run TestParseMeeting                        # one test
+TZ=America/Los_Angeles go test -run '^$' -fuzz '^FuzzParse$' -fuzztime 30s ./internal/dates   # fuzz one target
 ```
 
-## Architecture
+Before saying a change is done: `gofmt -l .` is empty, and `go vet ./...` and `go test ./...` pass. Paste the real output of any failure, don't summarize it away.
 
-- **`main.go`** is the composition root: loads data + Canvas config, builds the dashboard, wires navigation callbacks, and owns the Canvas polling goroutine. Sync runs off the UI thread and applies results via `app.QueueUpdateDraw`, then calls `store.SaveAppData` and `widgets.RefreshMainWidgets`.
-- **`internal/model`** — `AppData` (Student, Courses, Assignments, Tasks, Notes) is the single in-memory source of truth, passed as `*model.AppData` to every view.
-- **`internal/store`** — persistence under `os.UserConfigDir()/vio/`:
-  - `data.json` (`store.go`): created with sample starter data on first run. Both load and save pass through `normalizeAppData`, which fills missing fields from defaults, dedupes IDs, drops invalid course refs, normalizes task status to `complete` / `overdue` / `in_progress`, and marks past-due tasks `overdue`. It also migrates legacy `Course.MeetingTimes` strings ("Mon 12:34 PM") into structured `Course.Meetings`. Changes to the model usually need matching changes here.
-  - Saves are crash-safe (`atomic.go`): `writeFileAtomic` writes a hidden temp file in the same folder, fsyncs it, renames it over the target and fsyncs the folder. Each `data.json` save first copies the version it replaces to `data.json.bak` (only if that version is valid JSON and differs). If `data.json` can't be decoded, `LoadAppData` returns `*store.CorruptDataError`; `main.go`'s `loadOrRecover` (`recover.go`) shows a modal offering `store.RestoreBackup`, which moves the bad file aside as `data.json.corrupt-<time>` and restores the backup. Always write app files through `writeFileAtomic`, never `os.WriteFile`.
-  - `config.json` (`config.go`): Canvas domain, poll minutes, and the API token encrypted with AES-GCM using a key derived from username + hostname (so the config isn't portable between machines).
-- **`internal/canvas`** — Canvas REST client with `Link`-header pagination. `SyncCoursesAndAssignments` merges courses (preserving user-entered fields: location, meetings, notes; `main.go` reapplies them via `canvas.MergeCourses` for edits made mid-sync) but **replaces** the assignment list wholesale.
-- **`internal/widgets`** — the dashboard and its routing:
-  - `status.go` is the Canvas sync line in the dashboard header (`SyncStatus`: not set up / syncing / synced Xm ago / offline / failed). `main.go` updates it around each sync and refreshes it every 30s; call its methods on the UI goroutine.
-  - `widgets.go` builds the 5 dashboard panels (Calendar, Courses, Tasks, Today, Notes) and their summary text.
-  - `navigation.go` handles dashboard keys: `1`–`5` focus a panel, `Enter` opens it, `a` opens Assignments (it has no panel), `c` opens Canvas settings, `q` quits.
-  - `screenrouter.go` maps panel index → page constructor (index 5, `AssignmentsScreen`, is the Assignments page). The panel order in `BuildMainWidgets` must stay in sync with the `ScreenRouter` switch and `RefreshMainWidgets`.
-- **`internal/views/<feature>`** — full-screen pages. Convention: `XxxPage(app *tview.Application, data *model.AppData, returnTo func()) tview.Primitive`. Pages swap themselves in with `app.SetRoot(...)` and call `returnTo` on Esc. Detail pages (`courses/course_page.go`, `assignments/assignment_page.go`, `tasks/task_page.go`) open with Enter and share the framed, scrollable layout in `views/detail`. The day page is `schedule.DayPage` (used by the dashboard's Today panel and Enter on a calendar day): an agenda from `AppData.Agenda` where `+`/`e`/`-`/`x` add, edit, delete and complete tasks and ←/→ change day. Most views only read `AppData`; the tasks page (`views/tasks`), notes page (`views/notes`), and courses page (`views/courses`, `m` edits a course's meeting times; `model.MeetingConflicts` flags overlapping classes on the course page and dashboard) edit `data.Tasks` / `data.Notes` / `Course.Meetings` and save with `store.SaveAppData` themselves. The calendar page defaults to a week view (`views/calendar/week.go`, a custom `tview.Box` that draws its own grid with no background fills so transparent terminals show through); `v` toggles the month grid. Canvas sync in `main.go` keeps the live task and note lists when applying results, and `ScreenRouter` refreshes dashboard summaries when a page returns.
-- **`internal/model/agenda.go`** — `AppData.Agenda(day, includeDone)` merges a day's class meetings, assignments due and tasks due into time-ordered `AgendaItem`s; the Today panel and day page both use it. `models.go` gives `Assignment.State(now)` (missing / late / overdue / open / submitted), `Done()` and `NeedsAttention(now)` from Canvas's submission flags. `Assignment.Manual` marks assignments added in VIO: they're editable, and `canvas.KeepManual` keeps them through syncs (Canvas assignments stay read-only).
-- **`internal/dates`** — `dates.Parse(text, now)` reads form dates: "fri 5pm", "tomorrow", "+3d", "next tue noon", "11/20", "2026-11-20 17:00" (a day alone means 11:59 PM; "next X" is X in next Monday-start week). `tasks.DuePreview` shows the "reads as …" line under due fields.
-- **`internal/model/meetings.go`** — `Meeting` (days, 24-hour start/end, location) plus `ParseMeeting`/`ParseMeetings` for the one-per-line editor format ("Tue Thu 10:00 AM - 11:15 AM @ JD 1234", also "MW 2:30-3:45pm"), `FormatRange`, and `ShortCode` ("COMP 440-16707-FA2026" → "COMP 440").
-- **`internal/theme`** — palette, rounded borders, and color tags. `theme.ApplyTheme()` runs first in `main()` because tview copies `tview.Styles` into each widget at construction. Dashboard panels use `theme.StylePane`, page panels `theme.FramePanel`, and `theme.CourseColor(i)` gives each course (by index in `data.Courses`) its color; prefer the `theme.Tag*` constants over hard-coded color tags.
-- **`internal/asciiart`** — large ASCII headers for day and month names used by the calendar views.
+## Testing (fuzz / property-based)
 
-Text styling uses tview color tags (`[white::b]...[::-]`, `[red]...[-]`), so TextViews need `SetDynamicColors(true)`.
+Full guide and the list of laws: [docs/testing.md](docs/testing.md).
 
-## Docs
+- Every parser, normalizer, merge or ordering function gets **laws** (rules that hold for every input) checked by Go's built-in fuzzer, in the package's `fuzz_test.go`. Each law has an ID (D1, M3, S4...) listed in `docs/testing.md`. Add the ID in a comment above the check.
+- Pair laws with example (table-driven) tests for the specific cases a spec names.
+- When the fuzzer finds a failing input, add it to that target's `f.Add` seeds with a comment saying what it found, then fix the code. Every bug fix gets a regression test that fails on the old code.
+- Never delete, skip or weaken a test or a law to get green. If a law turns out wrong, stop and ask.
+- Fuzz with `TZ=America/Los_Angeles` so daylight-saving bugs can show up.
+- `internal/views` and `main.go` wiring are not unit-tested. Keep logic out of them so it can be tested in `model`, `dates`, `store` or `canvas`.
+- No third-party property-testing library: we use Go's `testing.F`. TODO: confirm this stays the rule (vs. adding `pgregory.net/rapid`).
 
-- `docs/*.rst` hold reference docs for each package (canvas, model, store, widgets).
-- `.kiro/` and `aidlc-docs/` are gitignored local AI-workflow material, not project source.
+This stays the rule, use Go's testing.F
+
+## Current decisions
+
+The full log with dates and reasons is in [docs/decisions.md](docs/decisions.md). The ones that most often affect code:
+
+- **Undated Canvas assignments stay undated.** Never fill in a placeholder due date. They list last under Upcoming as "no due date yet". (Law S4.)
+- **Task priority is optional per task** (US-22). A task with no priority is valid and must sort predictably.
+- **Canvas sync** replaces the Canvas assignment list but keeps manual assignments (`Assignment.Manual`), the user's course fields (location, meetings, notes), and the live task and note lists.
+- **Homebrew / release packaging is deferred as US-34.** Don't add GoReleaser, a tap, or release workflows unless a spec for US-34 says so.
+- **Data safety:** write app files only through `store.writeFileAtomic`, never `os.WriteFile`. Model changes usually need matching changes in `store.normalizeAppData`.
+- **Canvas token:** stored encrypted in `config.json`. Never log, print, or put it in test fixtures or error messages.
+- **Dependencies:** ask before adding any new module to `go.mod`.
+
+## Code map
+
+Architecture details: [docs/architecture.md](docs/architecture.md). Read the section for a package before changing it.
+
+- `src/main.go`: composition root, Canvas polling goroutine (applies results with `app.QueueUpdateDraw`)
+- `src/internal/model`: `AppData` (single source of truth), meetings, agenda, assignment state
+- `src/internal/store`: `data.json` / `config.json` persistence, normalization, atomic saves
+- `src/internal/canvas`: Canvas REST client and sync/merge
+- `src/internal/dates`: plain-language date parsing for forms
+- `src/internal/widgets`: dashboard panes, navigation keys, screen router
+- `src/internal/views/<feature>`: full-screen pages
+- `src/internal/theme`: colors and borders (use `theme.Tag*` constants)
+- `docs/*.rst`: package reference docs
+
+## How a build session runs
+
+The handoff loop and the spec template are in [docs/workflow.md](docs/workflow.md). In short:
+
+1. I paste a handoff spec: US number, rules, acceptance criteria, branch.
+2. Check you're on the spec's branch (`git branch --show-current`). If not, stop and give me the command to create or switch to it; don't switch yourself.
+3. Build it with tests, run the checks above, and fix what fails.
+4. End every session with a **Session report**:
+
+```
+## Session report: US-xx <title>
+Done: <each acceptance criterion: met / not met, and how it's tested>
+Files changed: <list>
+Tests: <commands run and their result>
+Laws added or changed: <IDs>
+Open questions / follow-ups: <for Chat>
+Suggested CLAUDE.md or docs changes: <if any; don't edit CLAUDE.md's rules yourself>
+
+### Git commands
+git status
+git add <files>
+git commit -m "US-xx: <summary>"
+git push -u origin <branch>
+```
+
+The commit message has no trailers of any kind.
+
+## Branches
+
+TODO: confirm the naming convention. Proposed: `us-xx-short-name` (e.g. `us-22-assignment-overlay`), branched from `main`. The repo currently has `main` and `tasks-crud`.
+
+Continue the branch naming convention as you have proposed.
+
+TODO: say whether work merges through pull requests on GitHub or locally.
+
+work will merge through pull requests locally. you will guide me on how to make these local changes reflect to github.
