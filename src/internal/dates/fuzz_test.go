@@ -7,7 +7,7 @@ import (
 )
 
 // Fuzz tests check laws: rules that must hold for every input, not just the
-// examples in dates_test.go. See aidlc-docs/design-artifacts/testing_strategy.md.
+// examples in dates_test.go. See docs/testing.md.
 //
 // `go test` runs each one on its seed inputs only. To search for new failing
 // inputs, run one fuzzer at a time, e.g.

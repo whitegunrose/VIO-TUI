@@ -7,7 +7,7 @@ import (
 )
 
 // Fuzz tests check laws: rules that must hold for every input. See
-// aidlc-docs/design-artifacts/testing_strategy.md. To search for new failing
+// docs/testing.md. To search for new failing
 // inputs: go test -run '^$' -fuzz FuzzParseMeeting -fuzztime 30s ./internal/model
 
 // Law M1: ParseMeeting never panics.
