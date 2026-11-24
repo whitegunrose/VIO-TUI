@@ -13,10 +13,15 @@ Affects: <packages, laws, files>
 
 ---
 
-## 2026-11-24 · (no story yet) · Canvas auth: current design and direction
+## 2026-11-24 · (workflow) · Claude Chat builds; Claude Code retired
+Decision: Claude Code is no longer used. Claude Chat plans and also writes the code and tests in this repo, from a plan I approve. The other rules stay: Claude never commits or pushes, no Claude attribution anywhere, one branch per story merged through a PR that I run. Replaces "Chat decides, Claude Code builds" (below).
+Why: My call: one place for planning and building.
+Affects: `CLAUDE.md` (intro, rule 4, How a build session runs), `docs/workflow.md`
+
+## 2026-11-24 · US-35, US-36, US-37 · Canvas auth: current design and direction
 Decision: Today the personal access token is stored AES-GCM encrypted in `config.json` (file mode 0600) with a key derived from username + hostname, so the config isn't portable between machines. OAuth sign-in is to be explored later. Moving the token to the OS keychain (macOS Keychain, Windows Credential Manager, Linux Secret Service), with the encrypted file kept as a fallback, is recommended but not yet approved.
 Why: The file key is built from values that aren't secret, so it mainly guards against the file being copied elsewhere; the keychain encrypts the token with the user's login and, on macOS, limits which apps can read it. OAuth needs a developer key from each school's Canvas admin (or a global key from Instructure) and short-lived tokens with refresh.
-Affects: `internal/store/config.go`, the Canvas settings page. TODO: assign stories in Chat once approved; a keychain library is a new `go.mod` dependency and needs approval.
+Affects: `internal/store/config.go`, the Canvas settings page. Stories: US-37 (startup crash), US-35 (keychain; library needs approval, new `go.mod` dependency), US-36 (OAuth research). Order: US-37 next, then US-35.
 
 ## 2026-11-24 · (workflow) · Branches and pull requests
 Decision: One branch per story, named `us-xx-short-name`, from an up-to-date `main`. Work merges into `main` through a pull request; I run every git step, and Claude Code's Git commands block includes the push, PR and post-merge cleanup commands.
@@ -29,6 +34,7 @@ Why: The built-in fuzzer already covers every law and needs no new dependency.
 Affects: `docs/testing.md`, every `fuzz_test.go`
 
 ## 2026-11-24 · (workflow) · Chat decides, Claude Code builds
+Replaced by "Claude Chat builds; Claude Code retired" (2026-11-24).
 Decision: Planning, the VIO Feature Roadmap and study guides live in Claude Chat. Claude Code builds from a handoff spec and never commits or pushes; I run git myself. No Claude attribution in any commit, PR or file. Rules Claude Code must follow live in `CLAUDE.md` or committed `docs/`, never only in `aidlc-docs/`.
 Why: Claude Code can't see Chat history; `aidlc-docs/` is gitignored.
 Affects: `CLAUDE.md`, `docs/workflow.md`
