@@ -56,6 +56,7 @@ Laws still without a fuzz test:
 
 ## Rules
 
+- Use Go's built-in fuzzer (`testing.F`). No third-party property-testing library.
 - New parsing, normalizing, merging or ordering code comes with at least one law and a fuzz target, plus example tests for the cases the spec names.
 - When the fuzzer finds a failing input, Go saves it under `internal/<pkg>/testdata/fuzz/<FuzzName>/`. Copy it into the target's `f.Add` seeds with a comment saying what it found, so it runs on every `go test`.
 - Every bug fix gets a regression test that fails on the old code.
