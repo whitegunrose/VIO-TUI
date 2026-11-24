@@ -1,6 +1,6 @@
 # CLAUDE.md
 
-Standing rules and current decisions for Claude Code in VIO-TUI. Keep this file short. Longer material lives in the committed `docs/` files linked below. If something here conflicts with a handoff spec, stop and ask.
+Standing rules and current decisions for Claude working in VIO-TUI (planning and coding both happen in Claude Chat; Claude Code is no longer used). Keep this file short. Longer material lives in the committed `docs/` files linked below. If something here conflicts with an approved plan, stop and ask.
 
 ## Project
 
@@ -10,8 +10,8 @@ VIO-TUI is a keyboard-driven terminal app (Go + [tview](https://github.com/rivo/
 
 1. **Never commit or push.** Do not run `git commit`, `git push`, `git merge`, `git rebase`, `git reset --hard`, `git tag`, or anything else that writes history or touches the remote. Edit files, then end with a **Git commands** block for me to run myself (see format below). Read-only git (`status`, `diff`, `log`, `branch --show-current`) is fine.
 2. **No Claude attribution, anywhere.** No `Co-Authored-By` trailers, no "Generated with Claude Code" lines, no Claude mentions in commit messages, PR text, code comments, or docs. Commit messages you suggest are plain, as if I wrote them.
-3. **Features are user stories, `US-xx`,** numbered as in the VIO Feature Roadmap. Use the number in branch names, suggested commit messages and test names where it helps. Never invent a new US number: if work doesn't fit an existing story, say so and I'll assign one in Chat.
-4. **Only build what the handoff spec says.** If the spec is unclear, or the code makes a rule in it impossible, stop and ask rather than guess. Note follow-up ideas at the end instead of building them.
+3. **Features are user stories, `US-xx`,** numbered as in the VIO Feature Roadmap. Use the number in branch names, suggested commit messages and test names where it helps. Never invent a new US number: if work doesn't fit an existing story, say so and I'll assign one.
+4. **Only build what the approved plan and story say.** If they are unclear, or the code makes a rule in it impossible, stop and ask rather than guess. Note follow-up ideas at the end instead of building them.
 5. **Anything you must follow lives in this file or a committed `docs/` file.** `aidlc-docs/` and `.kiro/` are gitignored local material: you may read them for background, but they are never the source of a rule, and committed code must not point readers to them.
 
 ## Commands
@@ -72,12 +72,12 @@ Architecture details: [docs/architecture.md](docs/architecture.md). Read the sec
 
 ## How a build session runs
 
-The handoff loop and the spec template are in [docs/workflow.md](docs/workflow.md). In short:
+The loop is in [docs/workflow.md](docs/workflow.md). In short:
 
-1. I paste a handoff spec: US number, rules, acceptance criteria, branch.
-2. Check you're on the spec's branch (`git branch --show-current`). If not, stop and give me the command to create or switch to it; don't switch yourself.
+1. We settle the story in Chat and I approve a plan: US number, rules, acceptance criteria, branch.
+2. Check you're on the story's branch (`git branch --show-current`). If not, stop and give me the command to create or switch to it; don't switch yourself.
 3. Build it with tests, run the checks above, and fix what fails.
-4. End every session with a **Session report**:
+4. End every build with a **Session report**:
 
 ```
 ## Session report: US-xx <title>
@@ -85,8 +85,8 @@ Done: <each acceptance criterion: met / not met, and how it's tested>
 Files changed: <list>
 Tests: <commands run and their result>
 Laws added or changed: <IDs>
-Open questions / follow-ups: <for Chat>
-Suggested CLAUDE.md or docs changes: <if any; don't edit CLAUDE.md's rules yourself>
+Open questions / follow-ups: <list>
+Suggested CLAUDE.md or docs changes: <if any; don't edit CLAUDE.md's rules without my OK>
 
 ### Git commands
 git status
