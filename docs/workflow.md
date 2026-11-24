@@ -11,7 +11,7 @@
 1. **Plan in Chat** until the feature is settled, then ask for a handoff spec in the template below.
 2. **Create the branch** (I run this): `git switch main && git pull && git switch -c us-xx-short-name`
 3. **Paste the spec into Claude Code.** It builds, tests, and ends with a Session report and git commands.
-4. **Review and run the git commands** myself.
+4. **Review and run the git commands** myself: commit, push the branch, open a pull request into `main` on GitHub and merge it, then `git switch main && git pull` and `git branch -d us-xx-short-name`.
 5. **Bring the Session report back to Chat** to update the roadmap and study guide.
 6. **End of planning session:** ask Chat "Give me the CLAUDE.md additions from today." Paste short rules into `CLAUDE.md`, longer material into `docs/decisions.md` (or another `docs/` file), and commit them.
 

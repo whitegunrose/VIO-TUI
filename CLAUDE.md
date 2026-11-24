@@ -42,9 +42,7 @@ Full guide and the list of laws: [docs/testing.md](docs/testing.md).
 - Never delete, skip or weaken a test or a law to get green. If a law turns out wrong, stop and ask.
 - Fuzz with `TZ=America/Los_Angeles` so daylight-saving bugs can show up.
 - `internal/views` and `main.go` wiring are not unit-tested. Keep logic out of them so it can be tested in `model`, `dates`, `store` or `canvas`.
-- No third-party property-testing library: we use Go's `testing.F`. TODO: confirm this stays the rule (vs. adding `pgregory.net/rapid`).
-
-This stays the rule, use Go's testing.F
+- No third-party property-testing library: use Go's built-in `testing.F` (no `pgregory.net/rapid`).
 
 ## Current decisions
 
@@ -99,12 +97,14 @@ git push -u origin <branch>
 
 The commit message has no trailers of any kind.
 
-## Branches
+## Branches and merging
 
-TODO: confirm the naming convention. Proposed: `us-xx-short-name` (e.g. `us-22-assignment-overlay`), branched from `main`. The repo currently has `main` and `tasks-crud`.
+- One branch per story: `us-xx-short-name` (e.g. `us-22-assignment-overlay`), branched from an up-to-date `main`.
+- Work reaches `main` through a pull request. I run every step myself, so the **Git commands** block ends with what gets the branch onto GitHub and merged: push the branch, open a PR into `main`, merge it, then update local `main` and delete the merged branch:
 
-Continue the branch naming convention as you have proposed.
-
-TODO: say whether work merges through pull requests on GitHub or locally.
-
-work will merge through pull requests locally. you will guide me on how to make these local changes reflect to github.
+```
+git push -u origin us-xx-short-name
+# open the PR on GitHub (or: gh pr create --base main --fill), review, merge
+git switch main && git pull
+git branch -d us-xx-short-name
+```
